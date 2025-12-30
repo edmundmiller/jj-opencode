@@ -4,10 +4,6 @@ function shell($: Shell, cwd?: string): Shell {
   return cwd ? $.cwd(cwd) : $
 }
 
-export function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-}
-
 export async function isJJRepo($: Shell, cwd?: string): Promise<boolean> {
   try {
     await shell($, cwd)`jj root 2>/dev/null`.text()
@@ -181,17 +177,6 @@ export async function undo($: Shell, cwd?: string): Promise<{ success: boolean; 
   }
 }
 
-export async function newChangeFromCurrent($: Shell, description: string, cwd?: string): Promise<{ success: boolean; changeId?: string; parentId?: string; error?: string }> {
-  try {
-    const parentId = await getCurrentChangeId($, cwd)
-    await shell($, cwd)`jj new -m ${description} 2>/dev/null`.text()
-    const changeId = await getCurrentChangeId($, cwd)
-    return { success: true, changeId: changeId || undefined, parentId: parentId || undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message || String(e) }
-  }
-}
-
 export async function newChangeFrom($: Shell, from: string, description: string, cwd?: string): Promise<{ success: boolean; changeId?: string; error?: string }> {
   try {
     await shell($, cwd)`jj new ${from} -m ${description} 2>/dev/null`.text()
@@ -275,47 +260,6 @@ export async function getBookmarkForChange($: Shell, rev: string = '@', cwd?: st
     return null
   } catch {
     return null
-  }
-}
-
-export async function rebase($: Shell, onto: string, cwd?: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    await shell($, cwd)`jj rebase -d ${onto} 2>/dev/null`.text()
-    return { success: true }
-  } catch (e: any) {
-    return { success: false, error: e.message || String(e) }
-  }
-}
-
-export async function squash($: Shell, message?: string, cwd?: string): Promise<{ success: boolean; error?: string }> {
-  const s = shell($, cwd)
-  try {
-    if (message) {
-      await s`jj squash -m ${message} 2>/dev/null`.text()
-    } else {
-      await s`jj squash 2>/dev/null`.text()
-    }
-    return { success: true }
-  } catch (e: any) {
-    return { success: false, error: e.message || String(e) }
-  }
-}
-
-export async function getParentDescription($: Shell, cwd?: string): Promise<string> {
-  try {
-    const result = await shell($, cwd)`jj log -r @- --no-graph -T 'description' 2>/dev/null`.text()
-    return result.trim()
-  } catch {
-    return ''
-  }
-}
-
-export async function getRepoRoot($: Shell, cwd?: string): Promise<string> {
-  try {
-    const result = await shell($, cwd)`jj root 2>/dev/null`.text()
-    return result.trim()
-  } catch {
-    return ''
   }
 }
 

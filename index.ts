@@ -64,13 +64,15 @@ const plugin: Plugin = async (ctx) => {
           return
         }
 
-        const changeId = await jj.getCurrentChangeId($)
-        const description = await jj.getCurrentDescription($)
-        const hasModifications = await jj.hasUncommittedChanges($)
+        const [changeId, description, hasModifications, workspaceName, workspacePath, bookmark] = await Promise.all([
+          jj.getCurrentChangeId($),
+          jj.getCurrentDescription($),
+          jj.hasUncommittedChanges($),
+          jj.getWorkspaceName($),
+          jj.getWorkspaceRoot($),
+          jj.getBookmarkForChange($),
+        ])
         const hasActiveWork = description.length > 0 || hasModifications
-        const workspaceName = await jj.getWorkspaceName($)
-        const workspacePath = await jj.getWorkspaceRoot($)
-        const bookmark = await jj.getBookmarkForChange($)
 
         createState(sessionId, {
           gateUnlocked: hasActiveWork,
@@ -266,14 +268,16 @@ const plugin: Plugin = async (ctx) => {
         async execute(args, context) {
           const state = getState(context.sessionID)
           const cwd = state?.workspacePath || undefined
-          const isRepo = await jj.isJJRepo($)
-          const changeId = await jj.getCurrentChangeId($, cwd)
-          const description = await jj.getCurrentDescription($, cwd)
-          const hasModifications = await jj.hasUncommittedChanges($, cwd)
-          const diffSummary = await jj.getDiffSummary($, cwd)
-          const status = await jj.getStatus($, cwd)
-          const workspaceName = await jj.getWorkspaceName($, cwd)
-          const bookmark = await jj.getBookmarkForChange($, '@', cwd)
+          const [isRepo, changeId, description, hasModifications, diffSummary, status, workspaceName, bookmark] = await Promise.all([
+            jj.isJJRepo($),
+            jj.getCurrentChangeId($, cwd),
+            jj.getCurrentDescription($, cwd),
+            jj.hasUncommittedChanges($, cwd),
+            jj.getDiffSummary($, cwd),
+            jj.getStatus($, cwd),
+            jj.getWorkspaceName($, cwd),
+            jj.getBookmarkForChange($, '@', cwd),
+          ])
 
           const gateUnlocked = isRepo && (description.length > 0 || hasModifications)
 
@@ -313,17 +317,19 @@ const plugin: Plugin = async (ctx) => {
         async execute(args, context) {
           const state = getState(context.sessionID)
           const cwd = state?.workspacePath || undefined
-          const currentDesc = await jj.getCurrentDescription($, cwd)
-          const hasModifications = await jj.hasUncommittedChanges($, cwd)
+          const [currentDesc, hasModifications, actualWorkspace, actualWorkspacePath, diffFiles] = await Promise.all([
+            jj.getCurrentDescription($, cwd),
+            jj.hasUncommittedChanges($, cwd),
+            jj.getWorkspaceName($, cwd),
+            jj.getWorkspaceRoot($, cwd),
+            jj.getDiffFiles($, cwd),
+          ])
           
           if (currentDesc.length === 0 && !hasModifications) {
             return messages.GATE_NOT_UNLOCKED
           }
 
-          const actualWorkspace = await jj.getWorkspaceName($, cwd)
-          const actualWorkspacePath = await jj.getWorkspaceRoot($, cwd)
           const isNonDefaultWorkspace = actualWorkspace !== 'default' && actualWorkspace !== ''
-          const diffFiles = await jj.getDiffFiles($, cwd)
           
           if (diffFiles.length === 0) {
             if (isNonDefaultWorkspace) {
@@ -349,11 +355,10 @@ const plugin: Plugin = async (ctx) => {
             return messages.PUSH_NO_CHANGES
           }
 
-          const description = await jj.getCurrentDescription($, cwd)
           const diffSummary = await jj.getDiffSummary($, cwd)
 
           if (!args.confirm) {
-            let confirmMsg = messages.PUSH_CONFIRMATION(description, diffFiles, diffSummary)
+            let confirmMsg = messages.PUSH_CONFIRMATION(currentDesc, diffFiles, diffSummary)
             if (isNonDefaultWorkspace) {
               confirmMsg += `\n\n**Workspace cleanup**: After push, \`${actualWorkspace}\` will be removed and you'll return to the main project directory.`
             }
@@ -361,8 +366,8 @@ const plugin: Plugin = async (ctx) => {
           }
 
           let warning = ''
-          if (description.length < 10) {
-            warning = messages.PUSH_DESCRIPTION_WARNING(description, diffFiles) + '\n\n'
+          if (currentDesc.length < 10) {
+            warning = messages.PUSH_DESCRIPTION_WARNING(currentDesc, diffFiles) + '\n\n'
           }
 
           const bookmark = args.bookmark || 'main'
@@ -401,7 +406,7 @@ const plugin: Plugin = async (ctx) => {
             modifiedFiles: [],
             bookmark: null,
           })
-          return warning + messages.PUSH_SUCCESS(description, bookmark)
+          return warning + messages.PUSH_SUCCESS(currentDesc, bookmark)
         },
       }),
 
