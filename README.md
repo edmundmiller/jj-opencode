@@ -3,17 +3,38 @@
 [![npm version](https://img.shields.io/npm/v/jj-opencode.svg)](https://www.npmjs.com/package/jj-opencode)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-OpenCode plugin that enforces JJ's "define change before implementation" workflow.
+**A simpler alternative to git worktrees for parallel AI-assisted development.**
+
+OpenCode plugin that combines JJ's powerful VCS with automatic workspace management — no merge conflicts, no staging area, no manual branch juggling.
+
+## Why Not Git Worktrees?
+
+Git worktrees let you work on multiple branches simultaneously, but they come with friction:
+
+| Git Worktrees | jj-opencode |
+|---------------|-------------|
+| Manual `git worktree add/remove` | Automatic workspace creation/cleanup |
+| Must manage branch names | Auto-generated from descriptions |
+| Merge conflicts on rebase | JJ auto-rebases, conflicts are rare |
+| Staging area complexity | No staging — working copy IS the commit |
+| Stash/unstash dance | Just `jj new` for a new change |
+| Easy to leave stale worktrees | Auto-cleanup after push |
+| Must remember which worktree you're in | Plugin tracks workspace state |
+
+**The mental model is simpler**: describe what you're doing → implement → push → done. The plugin handles everything else.
 
 ## What It Does
 
-This plugin prevents file modifications until you define what change you're making. It enforces the pattern:
+1. **Blocks edits** until you describe what you're about to do
+2. **Creates isolated workspaces** automatically (like worktrees, but managed for you)
+3. **Auto-cleans up** after you push — no stale worktrees accumulating
+4. **Parallel work just works** — create sibling workspaces, push them independently
+5. **No merge conflicts** — JJ rebases automatically, and conflicts are resolved in-place
 
+Under the hood, it ensures every change starts fresh from `main@origin`:
 ```bash
 jj git fetch && jj new main@origin -m "description of work"
 ```
-
-**Before** you can edit any files.
 
 ## Quick Start
 
@@ -24,11 +45,11 @@ npm install -g jj-opencode
 # 2. Add to OpenCode config (~/.config/opencode/config.json)
 { "plugin": ["jj-opencode"] }
 
-# 3. Start working - the AI handles the rest
-# When you ask it to edit files, it will:
-# - Suggest a JJ change description
-# - Create the change automatically (or ask for approval)
-# - Proceed with your requested edits
+# 3. Start working - the plugin handles the JJ workflow automatically:
+#    - Blocks edits until you define what you're doing
+#    - Creates isolated workspace for your change
+#    - Pushes and cleans up when you're done
+#    - Returns you to a clean state for the next task
 ```
 
 ## Installation
@@ -71,30 +92,67 @@ node bin/setup.js
 
 ## How It Works
 
-1. **Session starts in default workspace** → Gate is LOCKED
-2. **You ask AI to edit** → AI suggests a JJ change description
-3. **AI creates the change** → Creates workspace, moves session there, gate UNLOCKS
-4. **AI edits freely** → All changes tracked in the workspace's JJ change
-5. **Work complete** → Push via `jj_push()` (requires your confirmation)
-6. **Gate locks** → Next task creates a new change in the same workspace
+### The Solo Developer Cycle
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  1. OPEN REPO                                                   │
+│     Working copy is empty (clean from last session)             │
+│     Gate is LOCKED                                              │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  2. BEGIN CHANGE                                                │
+│     You ask AI to implement something                           │
+│     AI calls jj("description") → workspace auto-created         │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  3. IMPLEMENT                                                   │
+│     Gate UNLOCKED in workspace                                  │
+│     AI edits files freely                                       │
+│     All changes tracked in JJ change                            │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+          ┌───────────────────┴───────────────────┐
+          ↓                                       ↓
+┌─────────────────────────┐         ┌─────────────────────────────┐
+│  3b. PARALLEL WORK      │         │  4. PUSH                    │
+│  (optional)             │         │     jj_push() → confirm     │
+│                         │         │     Changes pushed to main  │
+│  Create sibling         │         │     Workspace auto-cleaned  │
+│  workspaces for         │         │     Returns to default      │
+│  other features         │         │     Gate LOCKS              │
+└─────────────────────────┘         └─────────────────────────────┘
+                                                  ↓
+                              ┌────────────────────────────────────┐
+                              │  Back to step 1 — ready for next   │
+                              └────────────────────────────────────┘
+```
+
+**Key insight**: After pushing, the workspace is automatically cleaned up and you return to the default workspace with an empty working copy. The cycle repeats cleanly.
 
 ### Automatic Workspace Isolation
 
-When `jj()` is called from the **default** workspace, it automatically:
+When `jj()` is called from the **default** workspace, the plugin:
 1. Creates `.workspaces/feature-slug/` subdirectory
-2. Moves the current session to that directory
-3. Creates a JJ change with a bookmark
+2. Moves the session to that workspace
+3. Creates a JJ change with an auto-generated bookmark
 4. Unlocks the gate
 
-Subsequent `jj()` calls within that workspace just create new changes (no additional workspaces). This keeps your default workspace pristine.
+When you `jj_push()` from a workspace:
+1. Changes are pushed to main (or specified bookmark)
+2. Workspace is automatically forgotten and deleted
+3. Session returns to the repo root
+4. Gate locks — ready for next cycle
 
 **Directory structure:**
 ```
 myproject/
 ├── .jj/                    # JJ internal storage
-├── .workspaces/            # AI agent workspaces (add to .gitignore)
-│   ├── add-auth/           # workspace for auth feature
-│   └── fix-bug-123/        # workspace for bug fix
+├── .workspaces/            # AI agent workspaces (gitignored)
+│   ├── add-auth/           # workspace for auth feature (temporary)
+│   └── fix-bug-123/        # workspace for bug fix (temporary)
 ├── src/
 └── ...
 ```
@@ -186,9 +244,13 @@ Descriptions must be at least 10 characters and more than one word. This ensures
 
 ## Typical Workflow
 
-Here's what a typical OpenCode session looks like with jj-opencode:
+Here's a complete session showing the full cycle:
 
 ```
+═══════════════════════════════════════════════════════════════════
+SESSION START — You open the repo (empty working copy from last time)
+═══════════════════════════════════════════════════════════════════
+
 You: "Add input validation to the signup form"
 
 AI: Creating JJ change: "Add input validation to signup form"
@@ -197,12 +259,12 @@ AI: Creating JJ change: "Add input validation to signup form"
     ✓ Change created (ID: kpxvmstq)
     ✓ Gate unlocked - editing enabled
 
-AI: [reads current code, makes edits to signup.ts]
+AI: [reads files from workspace, makes edits]
     I've added email format validation and password strength checks.
 
 You: "looks good, push it"
 
-AI: Ready to push to add-input-validation-to-signup-form:
+AI: Ready to push to main:
     
     Files changed (2):
       M src/signup.ts
@@ -214,58 +276,247 @@ AI: Ready to push to add-input-validation-to-signup-form:
 
 You: "yes"
 
-AI: ✓ Pushed to add-input-validation-to-signup-form
+AI: ✓ Pushed to main
     ✓ Workspace cleaned up
+    ✓ Returned to repo root
     ✓ Gate locked - ready for next task
+
+═══════════════════════════════════════════════════════════════════
+CYCLE COMPLETE — Back to clean state, ready for next feature
+═══════════════════════════════════════════════════════════════════
 
 You: "now add unit tests for that validation"
 
 AI: Creating JJ change: "Add unit tests for signup validation"
-    [creates change in current workspace, continues working...]
+    ✓ Workspace created: .workspaces/add-unit-tests-for-signup-validation/
+    ✓ Session moved to workspace
+    ✓ Change created (ID: mlqwxyzp)
+    ✓ Gate unlocked - editing enabled
+
+    [new workspace, new cycle, same pattern...]
 ```
 
 ### What Makes This Different
 
-- **No manual branching** — The AI creates a fresh JJ change from `main@origin` automatically
+- **Always fresh** — Each change starts from `main@origin`, never from stale local state
+- **Automatic cleanup** — Workspaces are deleted after push, no cruft accumulates
 - **Intentional commits** — Every change has a description before any code is written
-- **Safe checkpoints** — Gate locks after push, ensuring clean separation between tasks
+- **Clean cycles** — Gate locks after push, ensuring clean separation between tasks
 - **Instant recovery** — Made a mistake? `jj_undo()` reverts the last operation
 
 ## Parallel Development with Workspaces
 
-The first `jj()` call from the default workspace automatically creates a feature workspace. For **additional** parallel workspaces, use `jj_workspace()`:
+Work on multiple features simultaneously with sibling workspaces:
 
 ```
-You: "I want to work on auth improvements in parallel with the current work"
+═══════════════════════════════════════════════════════════════════
+SCENARIO: You're working on feature A, but need to also do feature B
+═══════════════════════════════════════════════════════════════════
 
-AI: [calls jj_workspace("Add authentication improvements")]
-    Workspace created: .workspaces/add-authentication-improvements/
+[Currently in workspace: add-feature-a]
+
+You: "I also need to fix that auth bug, but separately"
+
+AI: [calls jj_workspace("Fix authentication bypass vulnerability")]
+    Workspace created: .workspaces/fix-authentication-bypass-vulnerability/
     
     To work in this workspace, start a new OpenCode session:
-    cd .workspaces/add-authentication-improvements && opencode
+    cd .workspaces/fix-authentication-bypass-vulnerability && opencode
+
+═══════════════════════════════════════════════════════════════════
+Now you have two parallel workspaces:
+  .workspaces/add-feature-a/                    ← current session
+  .workspaces/fix-authentication-bypass-vulnerability/  ← new terminal
+═══════════════════════════════════════════════════════════════════
+
+[In the new terminal session]
+AI: Creating JJ change: "Fix authentication bypass vulnerability"
+    ✓ Change created in workspace
+    ✓ Gate unlocked
+    [implements fix, then...]
+
+You: "push this fix"
+
+AI: ✓ Pushed to main
+    ✓ Workspace cleaned up
+    ✓ Returned to repo root
+
+[Back in original terminal - feature A workspace]
+You: "ok finish up feature A"
+
+AI: [completes work]
+
+You: "push it"
+
+AI: ✓ Pushed to main
+    ✓ Workspace cleaned up  
+    ✓ All workspaces cleared, back to clean repo root
 ```
 
-In the new workspace session:
-- Call `jj("specific task")` to unlock editing
-- Work normally - edits are isolated to this workspace
-- `jj_push()` pushes to a named bookmark (not main)
-- After push, workspace is auto-cleaned up
+### How Parallel Workspaces Work
+
+- Each workspace is isolated — edits in one don't affect others
+- All workspaces share the same repo (via JJ's workspace feature)
+- Each `jj_push()` pushes that workspace's changes and cleans it up
+- When all workspaces are pushed, you're back to a clean repo root
 
 **Note**: Add `.workspaces/` to your `.gitignore`.
 
+### Side-by-Side: Git Worktrees vs jj-opencode
+
+<table>
+<tr>
+<th width="50%">Git Worktrees</th>
+<th width="50%">jj-opencode</th>
+</tr>
+<tr>
+<td>
+
+```bash
+# Create worktrees manually
+git worktree add ../proj-feature -b feature
+git worktree add ../proj-hotfix -b hotfix
+cd ../proj-feature
+```
+
+</td>
+<td>
+
+```
+You: "Add user authentication"
+
+AI: ✓ Workspace created automatically
+    ✓ Ready to edit
+```
+
+</td>
+</tr>
+<tr>
+<td>
+
+```bash
+# Work, then need to context switch
+git add -p  # careful staging
+git commit -m "WIP"
+git stash   # save incomplete work
+cd ../proj-hotfix
+```
+
+</td>
+<td>
+
+```
+You: "Also fix that auth bug"
+
+AI: ✓ Sibling workspace created
+    (open new terminal to work on it)
+```
+
+</td>
+</tr>
+<tr>
+<td>
+
+```bash
+# Finish hotfix
+git add . && git commit -m "fix"
+git push origin hotfix
+cd ../proj-feature
+git stash pop  # restore state
+```
+
+</td>
+<td>
+
+```
+[In hotfix terminal]
+You: "push it"
+
+AI: ✓ Pushed, workspace cleaned up
+```
+
+</td>
+</tr>
+<tr>
+<td>
+
+```bash
+# Finish feature
+git rebase main  # pray for no conflicts
+git push origin feature
+
+# Manual cleanup (often forgotten)
+git worktree remove ../proj-hotfix
+git branch -d hotfix
+```
+
+</td>
+<td>
+
+```
+[Back to feature terminal]
+You: "push it"
+
+AI: ✓ Pushed, workspace cleaned up
+    ✓ Back to clean repo root
+```
+
+</td>
+</tr>
+<tr>
+<td>
+
+**~20 commands**, manual cleanup, merge conflicts possible, stash/unstash dance
+
+</td>
+<td>
+
+**4 natural language requests**, automatic cleanup, no conflicts, no stashing
+
+</td>
+</tr>
+</table>
+
+### Cleanup for Accumulated Cruft
+
+If you abandon changes or workspaces accumulate, `jj_cleanup()` tidies up:
+
+```
+You: "clean up any stale stuff"
+
+AI: [calls jj_cleanup()]
+    
+    Cleanup preview:
+    
+    Empty commits (3):
+      kpxvmstq - (no description)
+      mlqwxyzp - abandoned experiment
+    
+    Stale workspaces (1):
+      fix-old-bug - already merged to main
+    
+    Confirm cleanup?
+
+You: "yes"
+
+AI: ✓ Abandoned 3 empty commits
+    ✓ Removed 1 stale workspace
+    ✓ Deleted bookmarks: fix-old-bug
+```
+
 ### Named Bookmarks (Feature Branches)
 
-For team workflows, create named bookmarks instead of pushing to main:
+For team workflows, push to a named bookmark instead of main:
 
 ```
 jj("Add user settings page", bookmark: "user-settings")
 ```
 
-This creates a change with bookmark `user-settings`. When you push, it goes to that branch.
+This creates a change with bookmark `user-settings`. When you push, it goes to that branch instead of main.
 
 ### Branch from Specific Revision
 
-Start from a different base:
+Start from a different base (not main):
 
 ```
 jj("Fix auth bug", from: "release-v2")
@@ -293,15 +544,43 @@ New to JJ? Here are the key concepts:
 - **Working copy = commit**: Your edits are always in a commit context
 - **`@`**: Refers to the current working-copy change
 
-## Why?
+## Why JJ Over Git?
 
-JJ (Jujutsu) treats the working copy as an implicit commit. The `jj new -m "description"` command declares your intent BEFORE you start implementing. This plugin enforces that pattern at the tooling level.
+JJ (Jujutsu) is a Git-compatible VCS that eliminates most of Git's complexity:
 
-Benefits:
-- **Intentionality**: Forces you to think before coding
-- **Audit trail**: Every change has a description from the start
-- **Parallel work**: Multiple changes as siblings from main
-- **JJ philosophy**: The tool enforces what JJ was designed for
+| Git Concept | JJ Equivalent |
+|-------------|---------------|
+| Staging area | None — working copy IS the commit |
+| `git stash` | Just `jj new` — everything's a commit |
+| Merge conflicts | Auto-rebase, conflicts resolved in-place |
+| Detached HEAD | Can't happen — `@` always points somewhere |
+| Branch management | Bookmarks are just labels, easily moved |
+| Worktrees | Built-in workspaces, simpler model |
+
+**This plugin adds**:
+- Automatic workspace creation/cleanup
+- Gate enforcement (describe before implement)
+- AI-friendly workflow (agents inherit state)
+- Clean development cycles
+
+### The Philosophy
+
+Every change starts with intent. Instead of:
+```bash
+git checkout -b feature-x
+# ... forget what you were doing ...
+git add -p  # what should I stage?
+git commit -m "stuff"  # vague message after the fact
+```
+
+You get:
+```bash
+jj("Add input validation to signup form")  # intent declared upfront
+# ... implement with full context ...
+jj_push()  # clean push, workspace cleaned up
+```
+
+**Intentionality** → **Audit trail** → **Clean parallel work** → **No cruft**
 
 ## Requirements
 
