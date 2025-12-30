@@ -109,7 +109,7 @@ const plugin: Plugin = async (ctx) => {
 
         const bashCheck = analyzeBashCommand(command)
         if (bashCheck.isModifying) {
-          const gateCheck = checkGate(sessionID, 'bash')
+          const gateCheck = await checkGate($, 'bash')
           if (!gateCheck.allowed) {
             throw new Error(gateCheck.message)
           }
@@ -118,7 +118,7 @@ const plugin: Plugin = async (ctx) => {
       }
 
       if (isGatedTool(toolName)) {
-        const gateCheck = checkGate(sessionID, toolName)
+        const gateCheck = await checkGate($, toolName)
         if (!gateCheck.allowed) {
           throw new Error(gateCheck.message)
         }
@@ -258,23 +258,26 @@ const plugin: Plugin = async (ctx) => {
         description: "Show current JJ change status, gate state, and diff summary",
         args: {},
         async execute(args, context) {
-          const state = getState(context.sessionID)
+          const isRepo = await jj.isJJRepo($)
           const changeId = await jj.getCurrentChangeId($)
           const description = await jj.getCurrentDescription($)
+          const hasModifications = await jj.hasUncommittedChanges($)
           const diffSummary = await jj.getDiffSummary($)
           const status = await jj.getStatus($)
           const workspaceName = await jj.getWorkspaceName($)
           const bookmark = await jj.getBookmarkForChange($)
+
+          const gateUnlocked = isRepo && (description.length > 0 || hasModifications)
 
           const lines = [
             '## JJ Status',
             '',
             `| Field | Value |`,
             `|-------|-------|`,
-            `| Gate | ${state?.gateUnlocked ? 'UNLOCKED' : 'LOCKED'} |`,
-            `| JJ Repo | ${state?.isJJRepo ? 'Yes' : 'No'} |`,
+            `| Gate | ${gateUnlocked ? 'UNLOCKED' : 'LOCKED'} |`,
+            `| JJ Repo | ${isRepo ? 'Yes' : 'No'} |`,
             `| Workspace | ${workspaceName} |`,
-            `| Bookmark | ${bookmark || state?.bookmark || '(none)'} |`,
+            `| Bookmark | ${bookmark || '(none)'} |`,
             `| Change ID | \`${changeId || 'none'}\` |`,
             `| Description | ${description || '(empty)'} |`,
             '',
@@ -300,12 +303,13 @@ const plugin: Plugin = async (ctx) => {
           confirm: tool.schema.boolean().optional().describe("Set to true ONLY after receiving explicit user permission to push"),
         },
         async execute(args, context) {
-          const state = getState(context.sessionID)
-          if (!state?.gateUnlocked) {
+          const currentDesc = await jj.getCurrentDescription($)
+          const hasModifications = await jj.hasUncommittedChanges($)
+          
+          if (currentDesc.length === 0 && !hasModifications) {
             return messages.GATE_NOT_UNLOCKED
           }
 
-          // Detect workspace at runtime instead of using frozen session state
           const actualWorkspace = await jj.getWorkspaceName($)
           const actualWorkspacePath = await jj.getWorkspaceRoot($)
           const isNonDefaultWorkspace = actualWorkspace !== 'default' && actualWorkspace !== ''
@@ -399,8 +403,8 @@ const plugin: Plugin = async (ctx) => {
         description: "Initialize JJ in this directory. Only available if not already a JJ repo.",
         args: {},
         async execute(args, context) {
-          const state = getState(context.sessionID)
-          if (state?.isJJRepo) {
+          const isRepo = await jj.isJJRepo($)
+          if (isRepo) {
             return "This directory is already a JJ repository. Use `jj()` to create a new change."
           }
 
@@ -408,10 +412,6 @@ const plugin: Plugin = async (ctx) => {
           if (!result.success) {
             return `Error initializing JJ: ${result.error}`
           }
-
-          setState(context.sessionID, {
-            isJJRepo: true,
-          })
 
           return messages.JJ_GIT_INIT_SUCCESS
         },
@@ -435,11 +435,6 @@ const plugin: Plugin = async (ctx) => {
           message: tool.schema.string().describe("New description for the current change"),
         },
         async execute(args, context) {
-          const state = getState(context.sessionID)
-          if (!state?.gateUnlocked) {
-            return "No active change. Call `jj()` first to create a change."
-          }
-
           const validation = validateDescription(args.message)
           if (!validation.valid) {
             return validation.message!
@@ -450,10 +445,6 @@ const plugin: Plugin = async (ctx) => {
             return `Error: ${result.error}`
           }
 
-          setState(context.sessionID, {
-            changeDescription: args.message,
-          })
-
           return `Description updated to: "${args.message}"`
         },
       }),
@@ -462,8 +453,10 @@ const plugin: Plugin = async (ctx) => {
         description: "Abandon the current JJ change and reset the gate. Use to start over.",
         args: {},
         async execute(args, context) {
-          const state = getState(context.sessionID)
-          if (!state?.gateUnlocked) {
+          const currentDesc = await jj.getCurrentDescription($)
+          const hasModifications = await jj.hasUncommittedChanges($)
+          
+          if (currentDesc.length === 0 && !hasModifications) {
             return "No active change to abandon."
           }
 
@@ -472,37 +465,22 @@ const plugin: Plugin = async (ctx) => {
             return `Error: ${result.error}`
           }
 
-          const isNonDefaultWorkspace = state.workspace !== 'default' && state.workspace !== ''
+          const workspaceName = await jj.getWorkspaceName($)
+          const workspacePath = await jj.getWorkspaceRoot($)
+          const isNonDefaultWorkspace = workspaceName !== 'default' && workspaceName !== ''
 
           if (isNonDefaultWorkspace) {
-            const repoRoot = state.workspacePath?.replace(/\/.workspaces\/[^/]+$/, '') || ''
-            await jj.workspaceForget($, state.workspace!)
+            const repoRoot = workspacePath.replace(/\/.workspaces\/[^/]+$/, '')
+            await jj.workspaceForget($, workspaceName)
             if (repoRoot) {
               try { (globalThis as any).process.chdir(repoRoot) } catch {}
             }
-            if (state.workspacePath) {
-              try { await $`rm -rf ${state.workspacePath}` } catch {}
+            if (workspacePath) {
+              try { await $`rm -rf ${workspacePath}` } catch {}
             }
             await jj.gitFetch($)
-            setState(context.sessionID, {
-              gateUnlocked: false,
-              changeId: null,
-              changeDescription: '',
-              modifiedFiles: [],
-              bookmark: null,
-              workspace: 'default',
-              workspacePath: repoRoot,
-            })
-            return `Change abandoned and workspace \`${state.workspace}\` cleaned up. Gate is now locked. Call \`jj()\` to start a new change.`
+            return `Change abandoned and workspace \`${workspaceName}\` cleaned up. Gate is now locked. Call \`jj()\` to start a new change.`
           }
-
-          setState(context.sessionID, {
-            gateUnlocked: false,
-            changeId: null,
-            changeDescription: '',
-            modifiedFiles: [],
-            bookmark: null,
-          })
 
           return "Change abandoned. Gate is now locked. Call `jj()` to start a new change."
         },

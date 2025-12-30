@@ -1,5 +1,7 @@
-import { getState } from './state.js'
 import { GATE_BLOCK_MESSAGE_PLANNING, GATE_BLOCK_MESSAGE_EXECUTION, NOT_JJ_REPO_MESSAGE } from './messages.js'
+import * as jj from './jj.js'
+
+type Shell = any
 
 const EXECUTION_TOOLS = new Set([
   'write',
@@ -78,24 +80,27 @@ export interface GateCheckResult {
   isExecution?: boolean
 }
 
-export function checkGate(sessionId: string, toolName: string): GateCheckResult {
+/**
+ * Check if the gate allows the tool to run.
+ * Queries JJ state directly - gate is unlocked if current change has a description OR modifications.
+ */
+export async function checkGate($: Shell, toolName: string): Promise<GateCheckResult> {
   if (isReadOnlyTool(toolName)) {
     return { allowed: true }
   }
 
-  const state = getState(sessionId)
   const isExecution = isExecutionTool(toolName)
 
-  if (!state) {
-    const message = isExecution ? GATE_BLOCK_MESSAGE_EXECUTION : GATE_BLOCK_MESSAGE_PLANNING
-    return { allowed: false, message, isExecution }
-  }
-
-  if (!state.isJJRepo) {
+  const isRepo = await jj.isJJRepo($)
+  if (!isRepo) {
     return { allowed: false, message: NOT_JJ_REPO_MESSAGE, isExecution }
   }
 
-  if (!state.gateUnlocked) {
+  const description = await jj.getCurrentDescription($)
+  const hasModifications = await jj.hasUncommittedChanges($)
+  const gateUnlocked = description.length > 0 || hasModifications
+
+  if (!gateUnlocked) {
     const message = isExecution ? GATE_BLOCK_MESSAGE_EXECUTION : GATE_BLOCK_MESSAGE_PLANNING
     return { allowed: false, message, isExecution }
   }
