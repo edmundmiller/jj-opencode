@@ -39,9 +39,16 @@ Validate and push the current JJ change to the remote repository.
 ## Workspace Cleanup
 
 When pushing from a non-default workspace (`.workspaces/feature-slug/`):
-- After successful push, the workspace is automatically deleted
-- Session returns to the main repo root
-- Gate locks, ready for next task
+
+1. Push completes successfully
+2. Workspace is forgotten from JJ tracking
+3. Workspace directory is deleted (`rm -rf .workspaces/feature-slug/`)
+4. `jj git fetch` runs on repo root to get latest
+5. `jj new main@origin` creates a fresh empty change
+6. Session returns to repo root
+7. Gate locks, ready for next task
+
+**Result**: You're back at a clean repo root with an empty working copy, ready for the next feature.
 
 ## Action
 
