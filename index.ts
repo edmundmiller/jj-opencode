@@ -125,7 +125,7 @@ const plugin: Plugin = async (ctx) => {
     },
 
     tool: {
-      jj_init: tool({
+      jj: tool({
         description: "Create a new JJ change and unlock file editing. Run this BEFORE making any file edits.",
         args: {
           description: tool.schema.string().describe("Description of the work you're about to do"),
@@ -193,70 +193,6 @@ const plugin: Plugin = async (ctx) => {
         },
       }),
 
-      jj_new: tool({
-        description: "Create a new sequential change from the current change. Use for multi-step work within a session.",
-        args: {
-          description: tool.schema.string().describe("Description of the next step/change"),
-        },
-        async execute(args, context) {
-          const state = getState(context.sessionID)
-          if (!state?.gateUnlocked) {
-            return messages.GATE_NOT_UNLOCKED
-          }
-
-          const validation = validateDescription(args.description)
-          if (!validation.valid) {
-            return validation.message!
-          }
-
-          const result = await jj.newChangeFromCurrent($, args.description)
-          if (!result.success) {
-            return `Error creating new change: ${result.error}`
-          }
-
-          setState(context.sessionID, {
-            changeId: result.changeId || null,
-            changeDescription: args.description,
-            modifiedFiles: [],
-          })
-
-          return messages.JJ_NEW_SUCCESS(
-            result.changeId || 'unknown',
-            args.description,
-            result.parentId || 'unknown'
-          )
-        },
-      }),
-
-      jj_describe: tool({
-        description: "Update the current change description",
-        args: {
-          message: tool.schema.string().describe("New description for the change"),
-        },
-        async execute(args, context) {
-          const state = getState(context.sessionID)
-          if (!state?.gateUnlocked) {
-            return messages.GATE_NOT_UNLOCKED
-          }
-
-          const validation = validateDescription(args.message)
-          if (!validation.valid) {
-            return validation.message!
-          }
-
-          const result = await jj.describe($, args.message)
-          if (!result.success) {
-            return `Error updating description: ${result.error}`
-          }
-
-          setState(context.sessionID, {
-            changeDescription: args.message,
-          })
-
-          return messages.DESCRIBE_SUCCESS(args.message)
-        },
-      }),
-
       jj_push: tool({
         description: "Validate changes and push to remote. First call shows confirmation, second call with confirm:true pushes.",
         args: {
@@ -302,38 +238,13 @@ const plugin: Plugin = async (ctx) => {
         },
       }),
 
-      jj_abandon: tool({
-        description: "Abandon the current change and reset the gate. Use this to start over.",
-        args: {},
-        async execute(args, context) {
-          const state = getState(context.sessionID)
-          if (!state?.gateUnlocked) {
-            return messages.GATE_NOT_UNLOCKED
-          }
-
-          const result = await jj.abandon($)
-          if (!result.success) {
-            return `Error abandoning change: ${result.error}`
-          }
-
-          setState(context.sessionID, {
-            gateUnlocked: false,
-            changeId: null,
-            changeDescription: '',
-            modifiedFiles: [],
-          })
-
-          return messages.ABANDON_SUCCESS
-        },
-      }),
-
       jj_git_init: tool({
         description: "Initialize JJ in this directory. Only available if not already a JJ repo.",
         args: {},
         async execute(args, context) {
           const state = getState(context.sessionID)
           if (state?.isJJRepo) {
-            return "This directory is already a JJ repository. Use `jj_init()` to create a new change."
+            return "This directory is already a JJ repository. Use `jj()` to create a new change."
           }
 
           const result = await jj.gitInit($)

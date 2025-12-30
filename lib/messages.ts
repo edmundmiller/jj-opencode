@@ -1,7 +1,3 @@
-/**
- * User-facing messages for jj-opencode plugin
- */
-
 export const GATE_BLOCK_MESSAGE = `
 **Edit blocked**: No JJ change defined for this session.
 
@@ -53,14 +49,14 @@ This directory is now a JJ repository. JJ is fully Git-compatible - your existin
 
 **Next step**: What change are you about to make?
 
-Call \`jj_init("description of your work")\` to create your first change and unlock file editing.
+Call \`jj("description of your work")\` to create your first change and unlock file editing.
 `
 
 export const GATE_NOT_UNLOCKED = `
 **No active JJ change.**
 
 You need to define your change first. Call:
-\`jj_init("description of your work")\`
+\`jj("description of your work")\`
 `
 
 export const PUSH_DESCRIPTION_WARNING = (description: string, files: string[]): string => `
@@ -69,7 +65,7 @@ export const PUSH_DESCRIPTION_WARNING = (description: string, files: string[]): 
 Current description: "${description}"
 Files modified: ${files.join(', ')}
 
-Consider updating the description with \`jj_describe()\` before pushing.
+Consider running \`jj describe -m "new description"\` before pushing.
 `
 
 export const PUSH_SUCCESS = (description: string, bookmark: string = 'main'): string => `
@@ -82,20 +78,6 @@ export const PUSH_NO_CHANGES = `
 **No changes to push.**
 
 The working copy has no modifications. Make some changes first, then call \`jj_push()\`.
-`
-
-export const ABANDON_SUCCESS = `
-**Change abandoned**
-
-The current change has been abandoned and the gate is now locked.
-
-To start new work, call \`jj_init("description of your work")\`.
-`
-
-export const DESCRIBE_SUCCESS = (newDescription: string): string => `
-**Description updated**
-
-New description: "${newDescription}"
 `
 
 export const DESCRIPTION_TOO_SHORT = (length: number): string => `
@@ -114,18 +96,6 @@ Single-word descriptions don't provide enough context. Please describe what chan
 Example: "Fix pagination bug in user list"
 `
 
-export const JJ_NEW_SUCCESS = (changeId: string, description: string, parentId: string): string => `
-**New change created**
-
-| Field | Value |
-|-------|-------|
-| Change ID | \`${changeId}\` |
-| Description | ${description} |
-| Parent | \`${parentId}\` |
-
-Continuing in sequential change. All edits now tracked in this change.
-`
-
 export const PUSH_CONFIRMATION = (description: string, files: string[], diffSummary: string): string => `
 **Ready to push?**
 
@@ -142,7 +112,7 @@ ${files.map(f => '- ' + f).join('\n')}
 ${diffSummary}
 \`\`\`
 
-Call \`jj_push()\` again with \`confirm: true\` to proceed, or \`jj_describe()\` to update the description first.
+Call \`jj_push(confirm: true)\` to proceed, or run \`jj describe -m "new description"\` to update first.
 `
 
 export const GIT_COMMAND_BLOCKED = (gitSubcommand: string, jjAlternative: string): string =>

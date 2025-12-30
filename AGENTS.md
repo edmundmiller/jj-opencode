@@ -16,7 +16,7 @@ JJ (Jujutsu) treats the working copy as an implicit commit. The `jj new -m "desc
 
 **Before any file modification**, you must define your change:
 
-1. Call `jj_init("description of your work")`
+1. Call `jj("description of your work")`
 2. This runs: `jj git fetch && jj new main@origin -m "description"`
 3. Gate unlocks - you can now edit files
 4. When done, call `jj_push()` to validate and push
@@ -25,12 +25,9 @@ JJ (Jujutsu) treats the working copy as an implicit commit. The `jj new -m "desc
 
 | Tool | Purpose | When Available |
 |------|---------|----------------|
-| `jj_init(description)` | Create new change from main@origin, unlock gate | Always |
-| `jj_new(description)` | Create sequential change from current (for multi-step work) | After jj_init |
+| `jj(description)` | Create new change from main@origin, unlock gate | Always |
 | `jj_status()` | Show change ID, description, diff summary, gate state | Always |
-| `jj_describe(message)` | Update current change description | After jj_init |
-| `jj_push(bookmark?, confirm?)` | Validate and push (first call shows preview, second with confirm:true pushes) | After jj_init |
-| `jj_abandon()` | Abandon current change, reset gate | After jj_init |
+| `jj_push(bookmark?, confirm?)` | Validate and push (first call shows preview, second with confirm:true pushes) | After jj |
 | `jj_git_init()` | Initialize JJ in non-JJ repo | Only if not JJ repo |
 
 ## Description Quality
@@ -89,7 +86,7 @@ User: "Add a validation function to utils.ts"
     ↓
 You attempt to edit → BLOCKED
     ↓
-You call: jj_init("Add input validation function to utils.ts")
+You call: jj("Add input validation function to utils.ts")
     ↓
 Gate UNLOCKS, change ID assigned
     ↓
@@ -104,9 +101,9 @@ Plugin validates description, pushes to remote
 
 Subagents spawned via `task` tool **inherit the parent session's gate state**.
 
-- If parent called `jj_init`, subagents can edit files
+- If parent called `jj()`, subagents can edit files
 - All edits go to the same JJ change
-- No need for subagents to call `jj_init` again
+- No need for subagents to call `jj()` again
 
 ## Non-JJ Repository Handling
 
@@ -122,8 +119,8 @@ If the working directory is not a JJ repository:
 | Situation | Solution |
 |-----------|----------|
 | Edit blocked unexpectedly | Call `jj_status()` to check gate state |
-| Wrong description | Call `jj_describe("new description")` |
-| Want to start over | Call `jj_abandon()` then `jj_init("new description")` |
+| Wrong description | Run `jj describe -m "new description"` |
+| Want to start over | Run `jj abandon` then `jj("new description")` |
 | Push fails | Check `jj_status()`, fix issues, try `jj_push()` again |
 
 ## JJ Concepts

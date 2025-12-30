@@ -28,43 +28,54 @@ Then add to your OpenCode config (`~/.config/opencode/config.json`):
 }
 ```
 
+The postinstall script automatically copies slash commands (`/jj`, `/jj-push`) to `~/.config/opencode/command/`.
+
 ### Local Development
 
 Clone the repo and symlink:
 
 ```bash
-git clone https://github.com/dpshade/jj-opencode
+git clone https://github.com/dps/jj-opencode
 cd jj-opencode
 bun install
 bun run build
 
 # Symlink the plugin
 ln -s $(pwd) ~/.config/opencode/plugin/jj-opencode
+
+# Install slash commands
+node bin/setup.js
 ```
 
 ## How It Works
 
 1. **Session starts** → Gate is LOCKED
 2. **You try to edit** → BLOCKED with helpful message
-3. **You call `jj_init("add feature X")`** → Gate UNLOCKS
+3. **You run `/jj "add feature X"`** → Gate UNLOCKS
 4. **You edit freely** → All changes tracked in JJ change
-5. **You call `jj_push()`** → Validates and pushes to remote
+5. **You run `/jj-push`** → Validates and pushes to remote
 
-## Available Tools
+## Available Commands
+
+### Slash Commands (User-facing)
+
+| Command | Purpose |
+|---------|---------|
+| `/jj "description"` | Create new JJ change and unlock editing |
+| `/jj-push` | Preview and push changes to remote |
+
+### Tools (AI-facing)
 
 | Tool | Purpose |
 |------|---------|
-| `jj_init(description)` | Create new JJ change from `main@origin`, unlock editing |
+| `jj(description)` | Create new JJ change from `main@origin`, unlock editing |
+| `jj_push(bookmark?, confirm?)` | Preview then push (requires `confirm: true`) |
 | `jj_status()` | Show current change, gate state, and diff summary |
-| `jj_push(bookmark?, confirm?)` | Preview then push (requires `confirm:true`) |
-| `jj_new(description)` | Create sequential change (for multi-step work) |
-| `jj_describe(message)` | Update change description |
-| `jj_abandon()` | Abandon change, reset gate |
 | `jj_git_init()` | Initialize JJ in non-JJ repo |
 
 ## What's Blocked
 
-Until `jj_init` is called:
+Until a change is defined via `/jj` or `jj()`:
 - File write/edit operations
 - Bash commands that modify files (sed -i, rm, mv, etc.)
 - LSP rename/code action operations
@@ -79,7 +90,7 @@ Until `jj_init` is called:
 | `git diff` | `jj diff` |
 | `git add` | (not needed) |
 | `git commit` | `jj describe -m "..."` |
-| `git push` | `jj_push()` |
+| `git push` | `/jj-push` or `jj_push()` |
 | `git checkout` | `jj edit <change>` |
 | `git branch` | `jj bookmark list` |
 | `git stash` | (use `jj new`) |
@@ -108,13 +119,13 @@ User: "Add a validation function to utils.ts"
     ↓
 AI attempts to edit → BLOCKED
     ↓
-AI calls: jj_init("Add input validation function to utils.ts")
+AI runs: /jj "Add input validation function to utils.ts"
     ↓
 Gate UNLOCKS, change ID assigned
     ↓
 AI edits utils.ts freely
     ↓
-Work complete → jj_push()
+Work complete → /jj-push
     ↓
 Plugin validates description, pushes to remote
 ```
