@@ -91,9 +91,11 @@ The plugin detects mode based on what tool is being blocked:
 
 | Tool | Purpose |
 |------|---------|
-| `jj(description)` | Create new JJ change from `main@origin`, unlock editing |
-| `jj_status()` | Show current change, gate state, and diff summary |
+| `jj(description, bookmark?, from?)` | Create new JJ change, unlock editing |
+| `jj_status()` | Show current change, gate state, workspace, and diff summary |
 | `jj_push(bookmark?, confirm?)` | Preview then push (requires `confirm: true`) |
+| `jj_workspace(description)` | Create sibling workspace for parallel development |
+| `jj_workspaces()` | List all workspaces with their status |
 | `jj_undo()` | Undo last JJ operation - instant recovery |
 | `jj_describe(message)` | Update description of current change |
 | `jj_abandon()` | Abandon current change, reset gate |
@@ -199,6 +201,44 @@ AI: Creating JJ change: "Add unit tests for signup validation"
 - **Intentional commits** — Every change has a description before any code is written
 - **Safe checkpoints** — Gate locks after push, ensuring clean separation between tasks
 - **Instant recovery** — Made a mistake? `jj_undo()` reverts the last operation
+
+## Parallel Development with Workspaces
+
+Need to work on multiple features simultaneously? Use workspaces:
+
+```
+You: "I want to work on auth improvements in parallel with the current work"
+
+AI: [calls jj_workspace("Add authentication improvements")]
+    Workspace created: ../myproject--add-authentication-improvements/
+    
+    To work in this workspace, start a new OpenCode session:
+    cd ../myproject--add-authentication-improvements && opencode
+```
+
+In the new workspace session:
+- Call `jj("specific task")` to unlock editing
+- Work normally - edits are isolated to this workspace
+- `jj_push()` pushes to a named bookmark (not main)
+- After push, workspace is auto-cleaned up
+
+### Named Bookmarks (Feature Branches)
+
+For team workflows, create named bookmarks instead of pushing to main:
+
+```
+jj("Add user settings page", bookmark: "user-settings")
+```
+
+This creates a change with bookmark `user-settings`. When you push, it goes to that branch.
+
+### Branch from Specific Revision
+
+Start from a different base:
+
+```
+jj("Fix auth bug", from: "release-v2")
+```
 
 ## Troubleshooting
 

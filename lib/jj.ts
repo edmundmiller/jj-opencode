@@ -160,3 +160,120 @@ export async function newChangeFromCurrent($: Shell, description: string): Promi
     return { success: false, error: e.message || String(e) }
   }
 }
+
+export async function newChangeFrom($: Shell, from: string, description: string): Promise<{ success: boolean; changeId?: string; error?: string }> {
+  try {
+    await $`jj new ${from} -m ${description}`
+    const changeId = await getCurrentChangeId($)
+    return { success: true, changeId: changeId || undefined }
+  } catch (e: any) {
+    return { success: false, error: e.message || String(e) }
+  }
+}
+
+export async function bookmarkSet($: Shell, name: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await $`jj bookmark set ${name} -r @`
+    return { success: true }
+  } catch (e: any) {
+    return { success: false, error: e.message || String(e) }
+  }
+}
+
+export async function getWorkspaceName($: Shell): Promise<string> {
+  try {
+    const result = await $`jj workspace list`.text()
+    const lines = result.trim().split('\n')
+    for (const line of lines) {
+      if (line.includes('@')) {
+        const match = line.match(/^(\S+):/)
+        if (match) {
+          return match[1]
+        }
+      }
+    }
+    return 'default'
+  } catch {
+    return 'default'
+  }
+}
+
+export async function getWorkspaceRoot($: Shell): Promise<string> {
+  try {
+    const result = await $`jj workspace root`.text()
+    return result.trim()
+  } catch {
+    return ''
+  }
+}
+
+export async function workspaceAdd($: Shell, path: string, name: string, revision: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await $`jj workspace add ${path} --name ${name} -r ${revision}`
+    return { success: true }
+  } catch (e: any) {
+    return { success: false, error: e.message || String(e) }
+  }
+}
+
+export async function workspaceList($: Shell): Promise<string> {
+  try {
+    const result = await $`jj workspace list`.text()
+    return result.trim()
+  } catch {
+    return ''
+  }
+}
+
+export async function workspaceForget($: Shell, name: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await $`jj workspace forget ${name}`
+    return { success: true }
+  } catch (e: any) {
+    return { success: false, error: e.message || String(e) }
+  }
+}
+
+export async function getBookmarkForChange($: Shell, rev: string = '@'): Promise<string | null> {
+  try {
+    const result = await $`jj log -r ${rev} --no-graph -T 'bookmarks'`.text()
+    const bookmarks = result.trim()
+    if (bookmarks && bookmarks.length > 0) {
+      return bookmarks.split(' ')[0]
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+export async function rebase($: Shell, onto: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await $`jj rebase -d ${onto}`
+    return { success: true }
+  } catch (e: any) {
+    return { success: false, error: e.message || String(e) }
+  }
+}
+
+export async function squash($: Shell, message?: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (message) {
+      await $`jj squash -m ${message}`
+    } else {
+      await $`jj squash`
+    }
+    return { success: true }
+  } catch (e: any) {
+    return { success: false, error: e.message || String(e) }
+  }
+}
+
+export async function getParentDescription($: Shell): Promise<string> {
+  try {
+    const result = await $`jj log -r @- --no-graph -T 'description'`.text()
+    return result.trim()
+  } catch {
+    return ''
+  }
+}

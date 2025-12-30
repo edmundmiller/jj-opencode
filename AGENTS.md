@@ -37,9 +37,11 @@ This means agents with file-writing capabilities proceed autonomously, while oth
 
 | Tool | Purpose | When Available |
 |------|---------|----------------|
-| `jj(description)` | Create new change from main@origin, unlock gate | Always |
+| `jj(description, bookmark?, from?)` | Create new change, unlock gate | Always |
 | `jj_status()` | Show change ID, description, diff summary, gate state | Always |
 | `jj_push(bookmark?, confirm?)` | Validate and push - **REQUIRES explicit user permission** | After jj |
+| `jj_workspace(description)` | Create sibling workspace for parallel development | Always |
+| `jj_workspaces()` | List all workspaces with status | Always |
 | `jj_git_init()` | Initialize JJ in non-JJ repo | Only if not JJ repo |
 | `jj_undo()` | Undo last JJ operation - instant recovery | Always |
 | `jj_describe(message)` | Update description of current change | After jj |
@@ -161,6 +163,49 @@ Subagents spawned via `task` tool **inherit the parent session's gate state**.
 - If parent called `jj()`, subagents can edit files
 - All edits go to the same JJ change
 - No need for subagents to call `jj()` again
+
+## Workspace Support (Parallel Development)
+
+Workspaces allow multiple OpenCode sessions to work on different features simultaneously:
+
+```
+jj_workspace("Add authentication system")
+→ Creates: ../project--add-authentication-system/
+→ User starts new OpenCode session in that directory
+→ Both workspaces share the same repo but have isolated working copies
+```
+
+### Workspace Workflow
+
+1. **Create workspace**: `jj_workspace("feature description")`
+2. **User opens new terminal**: `cd ../project--feature-slug && opencode`
+3. **Work in workspace**: Call `jj("task description")` to unlock, make edits
+4. **Push from workspace**: `jj_push()` pushes to named bookmark
+5. **Auto-cleanup**: After push, workspace is removed from tracking
+
+### Key Details
+
+- Workspaces are sibling directories: `../projectname--feature-slug/`
+- Each workspace has its own working copy but shares the repo
+- Bookmarks are auto-generated from descriptions: `"Add JWT auth"` → `add-jwt-auth`
+- Gate still requires `jj()` call in new workspace sessions
+
+## Named Bookmarks (Feature Branches)
+
+For team workflows, use named bookmarks instead of pushing directly to main:
+
+```
+jj("Add user settings page", bookmark: "user-settings")
+→ Creates change with bookmark `user-settings`
+→ jj_push() pushes to `user-settings` branch (not main)
+```
+
+Or branch from a specific revision:
+
+```
+jj("Fix auth bug", from: "release-v2")
+→ Creates change from release-v2 instead of main@origin
+```
 
 ## Non-JJ Repository Handling
 

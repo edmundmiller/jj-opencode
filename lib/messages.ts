@@ -127,3 +127,71 @@ export const GIT_COMMAND_BLOCKED = (gitSubcommand: string, jjAlternative: string
   `- Changes are automatically tracked\n` +
   `- Parallel changes are easy with \`jj new\`\n\n` +
   `Use the \`jj_*\` tools or run JJ commands directly.`
+
+export const WORKSPACE_CREATED = (name: string, path: string, description: string): string => `
+**Workspace created for parallel development**
+
+| Field | Value |
+|-------|-------|
+| Workspace | \`${name}\` |
+| Path | \`${path}\` |
+| Description | ${description} |
+| Base | \`main@origin\` (latest remote) |
+
+**To work in this workspace**, start a new OpenCode session:
+\`\`\`bash
+cd ${path} && opencode
+\`\`\`
+
+Then call \`jj("your task description")\` to unlock editing.
+`
+
+export const WORKSPACE_LIST_HEADER = `
+## JJ Workspaces
+
+| Workspace | Path | Change | Description |
+|-----------|------|--------|-------------|`
+
+export const PUSH_SUCCESS_WITH_CLEANUP = (bookmark: string, workspaceName: string, workspacePath: string): string => `
+**Pushed successfully**
+
+Change pushed to **${bookmark}**.
+
+**Workspace cleanup**: \`${workspaceName}\` has been removed from tracking.
+
+To delete the workspace directory:
+\`\`\`bash
+rm -rf ${workspacePath}
+\`\`\`
+
+Return to your main project directory to continue.
+`
+
+export const JJ_INIT_SUCCESS_WITH_BOOKMARK = (changeId: string, description: string, bookmark: string): string => `
+**Change created successfully**
+
+| Field | Value |
+|-------|-------|
+| Change ID | \`${changeId}\` |
+| Description | ${description} |
+| Bookmark | \`${bookmark}\` |
+| Base | \`main@origin\` (latest remote) |
+
+You may now edit files. All changes will be tracked in this change.
+
+When ready to push, call \`jj_push()\`.
+`
+
+export const JJ_INIT_SUCCESS_FROM = (changeId: string, description: string, from: string): string => `
+**Change created successfully**
+
+| Field | Value |
+|-------|-------|
+| Change ID | \`${changeId}\` |
+| Description | ${description} |
+| Base | \`${from}\` |
+
+You may now edit files. All changes will be tracked in this change.
+
+When ready to push, call \`jj_push()\`.
+`

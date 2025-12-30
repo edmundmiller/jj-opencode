@@ -9,6 +9,9 @@ export interface SessionState {
   parentSessionId?: string
   isJJRepo: boolean
   modifiedFiles: string[]
+  bookmark: string | null
+  workspace: string
+  workspacePath: string
 }
 
 const sessionState = new Map<string, SessionState>()
@@ -20,6 +23,9 @@ export function createState(sessionId: string, initial: Partial<SessionState> = 
     changeDescription: '',
     isJJRepo: true,
     modifiedFiles: [],
+    bookmark: null,
+    workspace: 'default',
+    workspacePath: '',
     ...initial,
   }
   sessionState.set(sessionId, state)
