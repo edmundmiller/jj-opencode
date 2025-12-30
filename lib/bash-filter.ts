@@ -35,7 +35,10 @@ const BASH_MODIFY_PATTERNS: RegExp[] = [
 ];
 
 const BASH_READONLY_PATTERNS: RegExp[] = [
-  /\bjj\s+(log|st|status|diff|show|op\s+log|file\s+show|git\s+fetch|evolog|bookmark\s+list)\b/,
+  // JJ read-only commands
+  /\bjj\s+(log|st|status|diff|show|op\s+log|file\s+show|git\s+fetch|evolog)\b/,
+  // JJ metadata commands (don't modify working copy files)
+  /\bjj\s+(abandon|undo|squash|bookmark|workspace)\b/,
   /\bcat\b(?!.*[>])/,
   /\bhead\b/,
   /\btail\b/,
