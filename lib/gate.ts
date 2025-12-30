@@ -29,8 +29,9 @@ const READ_ONLY_TOOLS = new Set([
   'background_cancel',
   'call_omo_agent',
   'interactive_bash',
-  'jj_init',
+  'jj',
   'jj_status',
+  'jj_push',
   'jj_git_init',
   'skill',
   'slashcommand',
@@ -43,10 +44,6 @@ const MODIFYING_TOOLS = new Set([
   'lsp_code_action_resolve',
   'ast_grep_replace',
   'todowrite',
-  'jj_new',
-  'jj_describe',
-  'jj_push',
-  'jj_abandon',
 ])
 
 export function isReadOnlyTool(toolName: string): boolean {
