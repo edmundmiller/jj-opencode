@@ -194,10 +194,10 @@ const plugin: Plugin = async (ctx) => {
       }),
 
       jj_push: tool({
-        description: "Validate changes and push to remote. First call shows confirmation, second call with confirm:true pushes.",
+        description: "Validate changes and push to remote. ALWAYS shows preview and requests USER permission. Never auto-confirm - wait for explicit user approval before calling with confirm:true.",
         args: {
           bookmark: tool.schema.string().optional().describe("Bookmark name to push (defaults to 'main')"),
-          confirm: tool.schema.boolean().optional().describe("Set to true to confirm and push after reviewing"),
+          confirm: tool.schema.boolean().optional().describe("Set to true ONLY after receiving explicit user permission to push"),
         },
         async execute(args, context) {
           const state = getState(context.sessionID)

@@ -99,7 +99,7 @@ Example: "Fix pagination bug in user list"
 `
 
 export const PUSH_CONFIRMATION = (description: string, files: string[], diffSummary: string): string => `
-**Ready to push?**
+**Push requires your approval**
 
 | Field | Value |
 |-------|-------|
@@ -114,7 +114,9 @@ ${files.map(f => '- ' + f).join('\n')}
 ${diffSummary}
 \`\`\`
 
-Call \`jj_push(confirm: true)\` to proceed, or run \`jj describe -m "new description"\` to update first.
+**Please confirm you want to push these changes.** I will not push without your explicit approval.
+
+To update the description first: \`jj describe -m "new description"\`
 `
 
 export const GIT_COMMAND_BLOCKED = (gitSubcommand: string, jjAlternative: string): string =>

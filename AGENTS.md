@@ -28,8 +28,18 @@ JJ (Jujutsu) treats the working copy as an implicit commit. The `jj new -m "desc
 |------|---------|----------------|
 | `jj(description)` | Create new change from main@origin, unlock gate | Always |
 | `jj_status()` | Show change ID, description, diff summary, gate state | Always |
-| `jj_push(bookmark?, confirm?)` | Validate and push (first call shows preview, second with confirm:true pushes) | After jj |
+| `jj_push(bookmark?, confirm?)` | Validate and push - **REQUIRES explicit user permission** | After jj |
 | `jj_git_init()` | Initialize JJ in non-JJ repo | Only if not JJ repo |
+
+## Push Requires User Permission
+
+**CRITICAL**: The `jj_push` tool ALWAYS requires explicit user permission.
+
+1. `jj_push()` - Shows preview, requests user approval
+2. **Wait for user to grant permission** - Never auto-confirm
+3. `jj_push(confirm: true)` - Only after user explicitly approves
+
+The AI must NEVER call `jj_push(confirm: true)` without receiving explicit user permission first.
 
 ## Description Quality
 
