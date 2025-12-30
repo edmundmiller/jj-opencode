@@ -189,9 +189,18 @@ const plugin: Plugin = async (ctx) => {
 
       if (toolName === 'bash' && state.pendingWarnings.length > 0) {
         const warningBlock = state.pendingWarnings.join('\n\n---\n\n')
-        output.output = output.output 
-          ? `${warningBlock}\n\n---\n\n${output.output}`
-          : warningBlock
+        // Inject warning into chat context without TUI display
+        try {
+          await client.session.prompt({
+            path: { id: sessionID },
+            body: {
+              noReply: true,
+              parts: [{ type: 'text', text: `[System Note]\n${warningBlock}` }],
+            },
+          })
+        } catch {
+          // Silently fail if injection doesn't work
+        }
         setState(sessionID, { pendingWarnings: [] })
       }
 
