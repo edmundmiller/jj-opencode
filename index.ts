@@ -140,9 +140,11 @@ const plugin: Plugin = async (ctx) => {
           ))
         }
 
+        const warnings: string[] = []
+
         const jjCheck = checkForJJCommand(command)
         if (jjCheck.hasPluginEquivalent) {
-          console.log(messages.JJ_COMMAND_WARNING(
+          warnings.push(messages.JJ_COMMAND_WARNING(
             jjCheck.jjSubcommand!,
             jjCheck.pluginAlternative!
           ))
@@ -150,13 +152,22 @@ const plugin: Plugin = async (ctx) => {
 
         const pushMainCheck = checkForJJPushMain(command)
         if (pushMainCheck.isPushingToMain) {
-          console.log(messages.JJ_PUSH_MAIN_WARNING)
+          warnings.push(messages.JJ_PUSH_MAIN_WARNING)
         }
 
         if (isModifyingBashCommand(command)) {
           const gateCheck = await checkGate($, 'bash')
           if (!gateCheck.allowed) {
-            console.log(messages.BASH_MODIFY_WARNING(command))
+            warnings.push(messages.BASH_MODIFY_WARNING(command))
+          }
+        }
+
+        if (warnings.length > 0) {
+          const state = getState(sessionID)
+          if (state) {
+            setState(sessionID, {
+              pendingWarnings: [...state.pendingWarnings, ...warnings],
+            })
           }
         }
         return
@@ -175,6 +186,14 @@ const plugin: Plugin = async (ctx) => {
       const state = getState(sessionID)
 
       if (!state) return
+
+      if (toolName === 'bash' && state.pendingWarnings.length > 0) {
+        const warningBlock = state.pendingWarnings.join('\n\n---\n\n')
+        output.output = output.output 
+          ? `${warningBlock}\n\n---\n\n${output.output}`
+          : warningBlock
+        setState(sessionID, { pendingWarnings: [] })
+      }
 
       if (toolName === 'write' || toolName === 'edit') {
         const filePath = output.metadata?.filePath || output.title

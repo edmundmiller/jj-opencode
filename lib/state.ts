@@ -12,6 +12,7 @@ export interface SessionState {
   bookmark: string | null
   workspace: string
   workspacePath: string
+  pendingWarnings: string[]
 }
 
 const sessionState = new Map<string, SessionState>()
@@ -26,6 +27,7 @@ export function createState(sessionId: string, initial: Partial<SessionState> = 
     bookmark: null,
     workspace: 'default',
     workspacePath: '',
+    pendingWarnings: [],
     ...initial,
   }
   sessionState.set(sessionId, state)
