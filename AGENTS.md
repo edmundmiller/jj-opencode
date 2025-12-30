@@ -20,7 +20,18 @@ JJ (Jujutsu) treats the working copy as an implicit commit. The `jj new -m "desc
 2. This runs: `jj git fetch && jj new main@origin -m "description"`
 3. Gate unlocks - you can now edit files
 4. When done, call `jj_push()` to push
-5. Gate locks again - next task requires new `/jj "description"`
+5. Gate locks again - next task requires new change
+
+## Agent Mode Behavior
+
+The plugin detects mode based on the tool being blocked:
+
+| Blocked Tool | Behavior |
+|--------------|----------|
+| `write`, `edit`, `lsp_rename`, etc. | **Execution**: Announce description, proceed automatically |
+| Other (bash, todowrite, etc.) | **Planning**: Suggest description, wait for approval |
+
+This means agents with file-writing capabilities proceed autonomously, while others ask first.
 
 ## Available Tools
 
@@ -30,6 +41,9 @@ JJ (Jujutsu) treats the working copy as an implicit commit. The `jj new -m "desc
 | `jj_status()` | Show change ID, description, diff summary, gate state | Always |
 | `jj_push(bookmark?, confirm?)` | Validate and push - **REQUIRES explicit user permission** | After jj |
 | `jj_git_init()` | Initialize JJ in non-JJ repo | Only if not JJ repo |
+| `jj_undo()` | Undo last JJ operation - instant recovery | Always |
+| `jj_describe(message)` | Update description of current change | After jj |
+| `jj_abandon()` | Abandon current change, reset gate | After jj |
 
 ## Push Requires User Permission
 
@@ -105,9 +119,39 @@ You edit utils.ts freely
     ↓
 Work complete → jj_push()
     ↓
+User confirms → pushed
+    ↓
 Gate LOCKS again (checkpoint complete)
     ↓
-Next task? Run jj("description") to start new checkpoint
+Next task? Call jj("description") to start new checkpoint
+```
+
+## Natural Conversation Flow
+
+When working with users, the flow should feel seamless:
+
+```
+User: "Refactor the auth module to use JWT"
+
+You: Creating JJ change: "Refactor auth module to use JWT"
+     [calls jj("Refactor auth module to use JWT")]
+     
+     Now I'll update the authentication logic...
+     [proceeds with edits]
+
+User: "Ship it"
+
+You: [calls jj_push() to show preview]
+     Ready to push:
+     - Modified: src/auth.ts, src/middleware.ts
+     - Description: "Refactor auth module to use JWT"
+     
+     Confirm?
+
+User: "yes"
+
+You: [calls jj_push(confirm: true)]
+     ✓ Pushed successfully. Gate locked for next task.
 ```
 
 ## Subagent Behavior
@@ -132,9 +176,10 @@ If the working directory is not a JJ repository:
 | Situation | Solution |
 |-----------|----------|
 | Edit blocked unexpectedly | Call `jj_status()` to check gate state |
-| Wrong description | Run `jj describe -m "new description"` |
-| Want to start over | Run `jj abandon` then `jj("new description")` |
+| Wrong description | Call `jj_describe("new description")` |
+| Want to start over | Call `jj_abandon()` then `jj("new description")` |
 | Push fails | Check `jj_status()`, fix issues, try `jj_push()` again |
+| Made a mistake | Call `jj_undo()` to revert last operation |
 
 ## JJ Concepts
 

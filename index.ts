@@ -266,6 +266,72 @@ const plugin: Plugin = async (ctx) => {
           return messages.JJ_GIT_INIT_SUCCESS
         },
       }),
+
+      jj_undo: tool({
+        description: "Undo the last JJ operation. Safe recovery from mistakes.",
+        args: {},
+        async execute(args, context) {
+          const result = await jj.undo($)
+          if (!result.success) {
+            return `Error: ${result.error}`
+          }
+          return "Undo successful. Last operation has been reverted."
+        },
+      }),
+
+      jj_describe: tool({
+        description: "Update the description of the current JJ change.",
+        args: {
+          message: tool.schema.string().describe("New description for the current change"),
+        },
+        async execute(args, context) {
+          const state = getState(context.sessionID)
+          if (!state?.gateUnlocked) {
+            return "No active change. Call `jj()` first to create a change."
+          }
+
+          const validation = validateDescription(args.message)
+          if (!validation.valid) {
+            return validation.message!
+          }
+
+          const result = await jj.describe($, args.message)
+          if (!result.success) {
+            return `Error: ${result.error}`
+          }
+
+          setState(context.sessionID, {
+            changeDescription: args.message,
+          })
+
+          return `Description updated to: "${args.message}"`
+        },
+      }),
+
+      jj_abandon: tool({
+        description: "Abandon the current JJ change and reset the gate. Use to start over.",
+        args: {},
+        async execute(args, context) {
+          const state = getState(context.sessionID)
+          if (!state?.gateUnlocked) {
+            return "No active change to abandon."
+          }
+
+          const result = await jj.abandon($)
+          if (!result.success) {
+            return `Error: ${result.error}`
+          }
+
+          setState(context.sessionID, {
+            gateUnlocked: false,
+            changeId: null,
+            changeDescription: '',
+            modifiedFiles: [],
+          })
+
+          return "Change abandoned. Gate is now locked. Call `jj()` to start a new change."
+        },
+      }),
     },
   }
 }

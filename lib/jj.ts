@@ -141,6 +141,15 @@ export async function gitInit($: Shell): Promise<{ success: boolean; error?: str
   }
 }
 
+export async function undo($: Shell): Promise<{ success: boolean; error?: string }> {
+  try {
+    await $`jj undo`
+    return { success: true }
+  } catch (e: any) {
+    return { success: false, error: e.message || String(e) }
+  }
+}
+
 export async function newChangeFromCurrent($: Shell, description: string): Promise<{ success: boolean; changeId?: string; parentId?: string; error?: string }> {
   try {
     const parentId = await getCurrentChangeId($)

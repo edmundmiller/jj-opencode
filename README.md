@@ -24,9 +24,11 @@ npm install -g jj-opencode
 # 2. Add to OpenCode config (~/.config/opencode/config.json)
 { "plugin": ["jj-opencode"] }
 
-# 3. Use /jj before editing
-/jj "Add feature X"
-# Now you can edit files
+# 3. Start working - the AI handles the rest
+# When you ask it to edit files, it will:
+# - Suggest a JJ change description
+# - Create the change automatically (or ask for approval)
+# - Proceed with your requested edits
 ```
 
 ## Installation
@@ -45,7 +47,10 @@ Then add to your OpenCode config (`~/.config/opencode/config.json`):
 }
 ```
 
-The postinstall script automatically copies slash commands (`/jj`, `/jj-push`) to `~/.config/opencode/command/`.
+**Optional**: Install slash commands for explicit user control:
+```bash
+node -e "require('jj-opencode/bin/setup.js')"
+```
 
 ### Local Development
 
@@ -67,29 +72,45 @@ node bin/setup.js
 ## How It Works
 
 1. **Session starts** → Gate is LOCKED
-2. **You try to edit** → BLOCKED with helpful message
-3. **You run `/jj "add feature X"`** → Gate UNLOCKS
-4. **You edit freely** → All changes tracked in JJ change
-5. **You run `/jj-push`** → Pushes to remote, **gate locks again**
-6. **Next task?** → Run `/jj "next task"` to unlock
+2. **You ask AI to edit** → AI suggests a JJ change description
+3. **AI creates the change** → Gate UNLOCKS (auto or after your approval)
+4. **AI edits freely** → All changes tracked in JJ change
+5. **Work complete** → Push via `jj_push()` (requires your confirmation)
+6. **Gate locks** → Next task starts fresh
 
-## Available Commands
+### Agent Mode Behavior
 
-### Slash Commands (User-facing)
+The plugin detects mode based on what tool is being blocked:
 
-| Command | Purpose |
-|---------|---------|
-| `/jj "description"` | Create new JJ change and unlock editing |
-| `/jj-push` | Preview and push changes to remote |
+| Blocked Tool | Behavior |
+|--------------|----------|
+| `write`, `edit`, etc. | Announces description, proceeds automatically |
+| Other tools | Suggests description, waits for approval |
 
-### Tools (AI-facing)
+## Available Tools
 
 | Tool | Purpose |
 |------|---------|
 | `jj(description)` | Create new JJ change from `main@origin`, unlock editing |
-| `jj_push(bookmark?, confirm?)` | Preview then push (requires `confirm: true`) |
 | `jj_status()` | Show current change, gate state, and diff summary |
+| `jj_push(bookmark?, confirm?)` | Preview then push (requires `confirm: true`) |
+| `jj_undo()` | Undo last JJ operation - instant recovery |
+| `jj_describe(message)` | Update description of current change |
+| `jj_abandon()` | Abandon current change, reset gate |
 | `jj_git_init()` | Initialize JJ in non-JJ repo |
+
+### Optional Slash Commands
+
+If you prefer explicit control, install the slash commands:
+
+```bash
+node -e "require('jj-opencode/bin/setup.js')"
+```
+
+| Command | Purpose |
+|---------|---------|
+| `/jj "description"` | Explicitly create a JJ change |
+| `/jj-push` | Explicitly trigger push flow |
 
 ## Push Requires Confirmation
 
@@ -135,38 +156,59 @@ What's always allowed:
 
 Descriptions must be at least 10 characters and more than one word. This ensures meaningful change context.
 
-## Workflow Example
+## Typical Workflow
+
+Here's what a typical OpenCode session looks like with jj-opencode:
 
 ```
-Session starts
-    ↓
-Gate is LOCKED
-    ↓
-User: "Add a validation function to utils.ts"
-    ↓
-AI attempts to edit → BLOCKED
-    ↓
-AI runs: /jj "Add input validation function to utils.ts"
-    ↓
-Gate UNLOCKS, change ID assigned
-    ↓
-AI edits utils.ts freely
-    ↓
-Work complete → /jj-push
-    ↓
-Gate LOCKS again (checkpoint complete)
-    ↓
-Next task? Run /jj "description" to start new checkpoint
+You: "Add input validation to the signup form"
+
+AI: Creating JJ change: "Add input validation to signup form"
+    ✓ Change created (ID: kpxvmstq)
+    ✓ Gate unlocked - editing enabled
+
+AI: [reads current code, makes edits to signup.ts]
+    I've added email format validation and password strength checks.
+
+You: "looks good, push it"
+
+AI: Ready to push to main:
+    
+    Files changed (2):
+      M src/signup.ts
+      M src/validation.ts
+    
+    Description: "Add input validation to signup form"
+    
+    Confirm push?
+
+You: "yes"
+
+AI: ✓ Pushed to main
+    ✓ Gate locked - ready for next task
+
+You: "now add unit tests for that validation"
+
+AI: Creating JJ change: "Add unit tests for signup validation"
+    [continues working...]
 ```
+
+### What Makes This Different
+
+- **No manual branching** — The AI creates a fresh JJ change from `main@origin` automatically
+- **Intentional commits** — Every change has a description before any code is written
+- **Safe checkpoints** — Gate locks after push, ensuring clean separation between tasks
+- **Instant recovery** — Made a mistake? `jj_undo()` reverts the last operation
 
 ## Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
 | Edit blocked unexpectedly | Run `jj_status()` to check gate state |
-| Wrong change description | Run `jj describe -m "new description"` |
-| Want to start over | Run `jj abandon` then `/jj "new description"` |
-| Push fails | Check `jj_status()`, fix issues, try `/jj-push` again |
+| Wrong change description | Run `jj_describe("new description")` |
+| Want to start over | Run `jj_abandon()` then create new change |
+| Made a mistake | Run `jj_undo()` to revert last operation |
+| Push fails | Check `jj_status()`, fix issues, try `jj_push()` again |
 | Plugin not loading | Verify `~/.config/opencode/config.json` includes `"plugin": ["jj-opencode"]` |
 
 ## JJ Concepts

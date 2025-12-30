@@ -1,7 +1,7 @@
 const BASH_MODIFY_PATTERNS: RegExp[] = [
   /\bsed\s+-i/,
   /\bperl\s+-[ip]/,
-  /[^<]>[^>]/,
+  /(?:^|[;&|)\s])>(?!>)/,  // Redirect with command boundary (fixes false positives)
   />>/,
   /\btee\b/,
   /\brm\s/,
@@ -87,15 +87,16 @@ export interface BashAnalysis {
 }
 
 export function analyzeBashCommand(command: string): BashAnalysis {
-  for (const pattern of BASH_READONLY_PATTERNS) {
-    if (pattern.test(command)) {
-      return { isModifying: false, isReadOnly: true, matchedPattern: pattern.source }
-    }
-  }
-
+  // Check MODIFY patterns FIRST (security-critical: prevents bypass via piped commands)
   for (const pattern of BASH_MODIFY_PATTERNS) {
     if (pattern.test(command)) {
       return { isModifying: true, isReadOnly: false, matchedPattern: pattern.source }
+    }
+  }
+
+  for (const pattern of BASH_READONLY_PATTERNS) {
+    if (pattern.test(command)) {
+      return { isModifying: false, isReadOnly: true, matchedPattern: pattern.source }
     }
   }
 

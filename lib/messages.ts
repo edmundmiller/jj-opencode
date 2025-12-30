@@ -1,19 +1,18 @@
-export const GATE_BLOCK_MESSAGE = `
-**Edit blocked**: No JJ change defined for this session.
+export const GATE_BLOCK_MESSAGE_PLANNING = `
+**Edit blocked**: No JJ change defined.
 
-Before I can modify files, I need to know what change you want to make.
+Before modifying files, I need to create a JJ change. Based on your request, I'll suggest a description.
 
-**What work are you about to do?**
-
-Once you describe it, I'll run:
-\`\`\`bash
-jj git fetch && jj new main@origin -m "your description"
-\`\`\`
-
-This creates a new JJ change that tracks all your work with clear intent.
-
-Just tell me what you're implementing and I'll set it up.
+**Please confirm or modify the description**, then I'll proceed.
 `
+
+export const GATE_BLOCK_MESSAGE_EXECUTION = `
+**Edit blocked**: No JJ change defined.
+
+Creating a JJ change based on your request, then proceeding with edits.
+`
+
+export const GATE_BLOCK_MESSAGE = GATE_BLOCK_MESSAGE_PLANNING
 
 export const NOT_JJ_REPO_MESSAGE = `
 **This directory is not a JJ repository.**
