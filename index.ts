@@ -38,6 +38,32 @@ function validateDescription(description: string): { valid: boolean; message?: s
   return { valid: true }
 }
 
+async function silentCleanup($: any, cwd?: string): Promise<{ cleaned: number }> {
+  try {
+    const [emptyCommits, staleWorkspaces] = await Promise.all([
+      jj.getEmptyCommits($, cwd),
+      jj.getStaleWorkspaces($, cwd),
+    ])
+    
+    let cleaned = 0
+    
+    if (emptyCommits.length > 0) {
+      const changeIds = emptyCommits.map(c => c.changeId)
+      const result = await jj.abandonCommits($, changeIds, cwd)
+      if (result.success) cleaned += result.abandoned
+    }
+    
+    for (const workspace of staleWorkspaces) {
+      const result = await jj.workspaceForget($, workspace.name, cwd)
+      if (result.success) cleaned++
+    }
+    
+    return { cleaned }
+  } catch {
+    return { cleaned: 0 }
+  }
+}
+
 const plugin: Plugin = async (ctx) => {
   const { client, $ } = ctx
 
@@ -396,6 +422,7 @@ const plugin: Plugin = async (ctx) => {
               workspace: 'default',
               workspacePath: repoRoot,
             })
+            await silentCleanup($, repoRoot)
             return warning + messages.PUSH_SUCCESS_WITH_CLEANUP(bookmark, actualWorkspace)
           }
 
@@ -406,6 +433,7 @@ const plugin: Plugin = async (ctx) => {
             modifiedFiles: [],
             bookmark: null,
           })
+          await silentCleanup($)
           return warning + messages.PUSH_SUCCESS(currentDesc, bookmark)
         },
       }),
