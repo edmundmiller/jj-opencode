@@ -38,7 +38,6 @@ Just: **describe → implement → push → done**.
 - [Parallel Development](#parallel-development-with-workspaces)
 - [Why JJ Over Git?](#why-jj-over-git)
 - [Troubleshooting](#troubleshooting)
-- [Author's Note](#authors-note)
 - [Warnings](#warnings)
 
 ---
@@ -90,28 +89,29 @@ Git worktrees let you work on multiple branches simultaneously. But they're a pa
 
 <table>
 <tr>
-<th width="50%">Git Worktrees (~20 commands)</th>
-<th width="50%">jj-opencode (4 requests)</th>
+<th width="50%">Git Worktrees (~15 commands)</th>
+<th width="50%">jj-opencode (2 conversations)</th>
 </tr>
 <tr>
 <td>
 
 ```bash
+# Terminal 1
 git worktree add ../proj-feature -b feature
-git worktree add ../proj-hotfix -b hotfix
 cd ../proj-feature
 # work...
-git add -p && git commit -m "WIP"
-git stash
+git add . && git commit -m "add auth"
+git rebase main
+git push origin feature
+
+# Terminal 2
+git worktree add ../proj-hotfix -b hotfix
 cd ../proj-hotfix
 # work...
 git add . && git commit -m "fix"
 git push origin hotfix
-cd ../proj-feature
-git stash pop
-# work...
-git rebase main
-git push origin feature
+
+# Cleanup (often forgotten)
 git worktree remove ../proj-hotfix
 git branch -d hotfix
 ```
@@ -120,19 +120,19 @@ git branch -d hotfix
 <td>
 
 ```
+# Terminal 1: opencode
 You: "Add authentication"
 AI:  ✓ Workspace created
-     ✓ Ready to edit
-
-You: "Also fix that auth bug"
-AI:  ✓ Sibling workspace created
-
-You: "push the fix"
+     [works...] 
+You: "ship it"
 AI:  ✓ Pushed, cleaned up
 
-You: "push the feature"
+# Terminal 2: opencode (same repo)
+You: "Fix that auth bug"
+AI:  ✓ Workspace created
+     [works...]
+You: "ship it"
 AI:  ✓ Pushed, cleaned up
-     ✓ Back to clean state
 ```
 
 </td>
@@ -234,20 +234,23 @@ Until you describe your change:
 <td>
 
 ```bash
-# Create worktrees manually
+# Terminal 1: Set up feature work
 git worktree add ../proj-feature -b feature
-git worktree add ../proj-hotfix -b hotfix
 cd ../proj-feature
+# work on feature...
 ```
 
 </td>
 <td>
 
 ```
+# Terminal 1
+$ opencode
 You: "Add user authentication"
 
-AI: ✓ Workspace created automatically
+AI: ✓ Workspace created
     ✓ Ready to edit
+    [working on feature...]
 ```
 
 </td>
@@ -256,21 +259,23 @@ AI: ✓ Workspace created automatically
 <td>
 
 ```bash
-# Work, then need to context switch
-git add -p  # careful staging
-git commit -m "WIP"
-git stash   # save incomplete work
+# Terminal 2: Set up hotfix (separate terminal)
+git worktree add ../proj-hotfix -b hotfix
 cd ../proj-hotfix
+# work on hotfix...
 ```
 
 </td>
 <td>
 
 ```
-You: "Also fix that auth bug"
+# Terminal 2 (same repo, new opencode)
+$ opencode
+You: "Fix that auth bug"
 
-AI: ✓ Sibling workspace created
-    (open new terminal to work on it)
+AI: ✓ Workspace created
+    ✓ Ready to edit
+    [working on fix...]
 ```
 
 </td>
@@ -279,19 +284,17 @@ AI: ✓ Sibling workspace created
 <td>
 
 ```bash
-# Finish hotfix
-git add . && git commit -m "fix"
+# Terminal 2: Push hotfix
+git add . && git commit -m "fix auth bug"
 git push origin hotfix
-cd ../proj-feature
-git stash pop  # restore state
 ```
 
 </td>
 <td>
 
 ```
-[In hotfix terminal]
-You: "push it"
+# Terminal 2
+You: "ship it"
 
 AI: ✓ Pushed, workspace cleaned up
 ```
@@ -302,7 +305,8 @@ AI: ✓ Pushed, workspace cleaned up
 <td>
 
 ```bash
-# Finish feature
+# Terminal 1: Push feature
+git add . && git commit -m "add auth"
 git rebase main  # pray for no conflicts
 git push origin feature
 
@@ -315,11 +319,10 @@ git branch -d hotfix
 <td>
 
 ```
-[Back to feature terminal]
-You: "push it"
+# Terminal 1
+You: "ship it"
 
 AI: ✓ Pushed, workspace cleaned up
-    ✓ Back to clean repo root
 ```
 
 </td>
@@ -327,12 +330,12 @@ AI: ✓ Pushed, workspace cleaned up
 <tr>
 <td>
 
-**~20 commands**, manual cleanup, merge conflicts possible, stash/unstash dance
+**~15 commands** across 2 terminals, manual cleanup, merge conflicts possible
 
 </td>
 <td>
 
-**4 natural language requests**, automatic cleanup, no conflicts, no stashing
+**2 conversations**, automatic cleanup, no conflicts
 
 </td>
 </tr>
@@ -378,32 +381,20 @@ AI: ✓ Pushed to main
 
 ## Parallel Development with Workspaces
 
-Work on multiple features at once:
+Work on multiple features at once — just open multiple terminals:
 
 ```
-═══════════════════════════════════════════════════════════════════
-You're working on feature A, but need to also do feature B
-═══════════════════════════════════════════════════════════════════
+# Terminal 1                          # Terminal 2
+$ opencode                            $ opencode
+You: "Add authentication"             You: "Fix that auth bug"
+AI: ✓ Workspace created               AI: ✓ Workspace created
+    [working...]                          [working...]
 
-[Currently in workspace: add-feature-a]
-
-You: "I also need to fix that auth bug, but separately"
-
-AI: Workspace created: .workspaces/fix-auth-bug/
-    
-    To work on it, open a new terminal:
-    cd .workspaces/fix-auth-bug && opencode
-
-═══════════════════════════════════════════════════════════════════
-Now you have two parallel workspaces:
-  .workspaces/add-feature-a/     ← current session
-  .workspaces/fix-auth-bug/      ← new terminal
-═══════════════════════════════════════════════════════════════════
-
-# Push them independently, in any order
-# Each push cleans up that workspace
-# When all done, you're back to clean repo root
+# Both work independently in isolated workspaces
+# Push in any order — each cleans up automatically
 ```
+
+Each `opencode` session gets its own workspace. No coordination needed.
 
 ### Directory Structure
 
@@ -467,18 +458,6 @@ jj_push()  # clean push, workspace cleaned up
 | Made a mistake | `jj_undo()` |
 | Push fails | `jj_status()`, fix issues, try again |
 | Cruft accumulated | `jj_cleanup()` |
-
----
-
-## Author's Note
-
-I built this because git worktrees are powerful but annoying, and AI agents kept getting confused about which directory they were in, what state the repo was in, and whether they'd cleaned up properly.
-
-JJ fixes the VCS complexity. This plugin fixes the workflow complexity.
-
-**The result**: You describe what you want to build. The AI builds it. You push. Done. No ceremony.
-
-If you're still doing the `git stash && cd ../worktree && git stash pop` dance in 2025, I'm sorry. There's a better way now.
 
 ---
 
