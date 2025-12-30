@@ -71,12 +71,33 @@ node bin/setup.js
 
 ## How It Works
 
-1. **Session starts** → Gate is LOCKED
+1. **Session starts in default workspace** → Gate is LOCKED
 2. **You ask AI to edit** → AI suggests a JJ change description
-3. **AI creates the change** → Gate UNLOCKS (auto or after your approval)
-4. **AI edits freely** → All changes tracked in JJ change
+3. **AI creates the change** → Creates workspace, moves session there, gate UNLOCKS
+4. **AI edits freely** → All changes tracked in the workspace's JJ change
 5. **Work complete** → Push via `jj_push()` (requires your confirmation)
-6. **Gate locks** → Next task starts fresh
+6. **Gate locks** → Next task creates a new change in the same workspace
+
+### Automatic Workspace Isolation
+
+When `jj()` is called from the **default** workspace, it automatically:
+1. Creates `.workspaces/feature-slug/` subdirectory
+2. Moves the current session to that directory
+3. Creates a JJ change with a bookmark
+4. Unlocks the gate
+
+Subsequent `jj()` calls within that workspace just create new changes (no additional workspaces). This keeps your default workspace pristine.
+
+**Directory structure:**
+```
+myproject/
+├── .jj/                    # JJ internal storage
+├── .workspaces/            # AI agent workspaces (add to .gitignore)
+│   ├── add-auth/           # workspace for auth feature
+│   └── fix-bug-123/        # workspace for bug fix
+├── src/
+└── ...
+```
 
 ### Agent Mode Behavior
 
@@ -94,7 +115,7 @@ The plugin detects mode based on what tool is being blocked:
 | `jj(description, bookmark?, from?)` | Create new JJ change, unlock editing |
 | `jj_status()` | Show current change, gate state, workspace, and diff summary |
 | `jj_push(bookmark?, confirm?)` | Preview then push (requires `confirm: true`) |
-| `jj_workspace(description)` | Create sibling workspace for parallel development |
+| `jj_workspace(description)` | Create workspace in .workspaces/ for parallel development |
 | `jj_workspaces()` | List all workspaces with their status |
 | `jj_undo()` | Undo last JJ operation - instant recovery |
 | `jj_describe(message)` | Update description of current change |
@@ -166,6 +187,8 @@ Here's what a typical OpenCode session looks like with jj-opencode:
 You: "Add input validation to the signup form"
 
 AI: Creating JJ change: "Add input validation to signup form"
+    ✓ Workspace created: .workspaces/add-input-validation-to-signup-form/
+    ✓ Session moved to workspace
     ✓ Change created (ID: kpxvmstq)
     ✓ Gate unlocked - editing enabled
 
@@ -174,7 +197,7 @@ AI: [reads current code, makes edits to signup.ts]
 
 You: "looks good, push it"
 
-AI: Ready to push to main:
+AI: Ready to push to add-input-validation-to-signup-form:
     
     Files changed (2):
       M src/signup.ts
@@ -186,13 +209,14 @@ AI: Ready to push to main:
 
 You: "yes"
 
-AI: ✓ Pushed to main
+AI: ✓ Pushed to add-input-validation-to-signup-form
+    ✓ Workspace cleaned up
     ✓ Gate locked - ready for next task
 
 You: "now add unit tests for that validation"
 
 AI: Creating JJ change: "Add unit tests for signup validation"
-    [continues working...]
+    [creates change in current workspace, continues working...]
 ```
 
 ### What Makes This Different
@@ -204,16 +228,16 @@ AI: Creating JJ change: "Add unit tests for signup validation"
 
 ## Parallel Development with Workspaces
 
-Need to work on multiple features simultaneously? Use workspaces:
+The first `jj()` call from the default workspace automatically creates a feature workspace. For **additional** parallel workspaces, use `jj_workspace()`:
 
 ```
 You: "I want to work on auth improvements in parallel with the current work"
 
 AI: [calls jj_workspace("Add authentication improvements")]
-    Workspace created: ../myproject--add-authentication-improvements/
+    Workspace created: .workspaces/add-authentication-improvements/
     
     To work in this workspace, start a new OpenCode session:
-    cd ../myproject--add-authentication-improvements && opencode
+    cd .workspaces/add-authentication-improvements && opencode
 ```
 
 In the new workspace session:
@@ -221,6 +245,8 @@ In the new workspace session:
 - Work normally - edits are isolated to this workspace
 - `jj_push()` pushes to a named bookmark (not main)
 - After push, workspace is auto-cleaned up
+
+**Note**: Add `.workspaces/` to your `.gitignore`.
 
 ### Named Bookmarks (Feature Branches)
 

@@ -140,6 +140,7 @@ const GIT_TO_JJ: Record<string, string> = {
 }
 
 const GIT_COMMAND_PATTERN = /\bgit\s+([a-z-]+)/i
+const JJ_GIT_PATTERN = /\bjj\s+git\b/i
 
 export interface GitCommandCheck {
   isGitCommand: boolean
@@ -148,6 +149,10 @@ export interface GitCommandCheck {
 }
 
 export function checkForGitCommand(command: string): GitCommandCheck {
+  if (JJ_GIT_PATTERN.test(command)) {
+    return { isGitCommand: false }
+  }
+
   const match = command.match(GIT_COMMAND_PATTERN)
   if (!match) {
     return { isGitCommand: false }

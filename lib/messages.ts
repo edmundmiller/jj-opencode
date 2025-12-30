@@ -195,3 +195,19 @@ You may now edit files. All changes will be tracked in this change.
 
 When ready to push, call \`jj_push()\`.
 `
+
+export const JJ_WORKSPACE_REDIRECT = (changeId: string, description: string, workspaceName: string, workspacePath: string): string => `
+**Workspace created and session moved**
+
+| Field | Value |
+|-------|-------|
+| Change ID | \`${changeId}\` |
+| Description | ${description} |
+| Workspace | \`${workspaceName}\` |
+| Path | \`${workspacePath}\` |
+| Base | \`main@origin\` (latest remote) |
+
+You may now edit files. All changes will be tracked in this workspace.
+
+When ready to push, call \`jj_push()\`.
+`

@@ -17,10 +17,32 @@ JJ (Jujutsu) treats the working copy as an implicit commit. The `jj new -m "desc
 **Before any file modification**, you must define your change:
 
 1. Call `jj("description of your work")`
-2. This runs: `jj git fetch && jj new main@origin -m "description"`
-3. Gate unlocks - you can now edit files
-4. When done, call `jj_push()` to push
-5. Gate locks again - next task requires new change
+2. **From default workspace**: Creates a dedicated workspace, moves session there, then creates change
+3. **From feature workspace**: Creates change in current workspace (no new workspace needed)
+4. Gate unlocks - you can now edit files
+5. When done, call `jj_push()` to push
+6. Gate locks again - next task requires new change
+
+### Automatic Workspace Isolation
+
+When `jj()` is called from the **default** workspace, it automatically:
+1. Creates `.workspaces/feature-slug/` subdirectory (gitignored)
+2. Moves the current session to that directory
+3. Creates a JJ change there with a bookmark
+4. Unlocks the gate
+
+This keeps the default workspace pristine. Subsequent `jj()` calls within a feature workspace just create new changes - no additional workspaces.
+
+**Directory structure:**
+```
+myproject/
+├── .jj/                    # JJ internal storage
+├── .workspaces/            # AI agent workspaces (add to .gitignore)
+│   ├── add-auth/           # workspace for auth feature
+│   └── fix-bug-123/        # workspace for bug fix
+├── src/
+└── ...
+```
 
 ## Agent Mode Behavior
 
@@ -40,7 +62,7 @@ This means agents with file-writing capabilities proceed autonomously, while oth
 | `jj(description, bookmark?, from?)` | Create new change, unlock gate | Always |
 | `jj_status()` | Show change ID, description, diff summary, gate state | Always |
 | `jj_push(bookmark?, confirm?)` | Validate and push - **REQUIRES explicit user permission** | After jj |
-| `jj_workspace(description)` | Create sibling workspace for parallel development | Always |
+| `jj_workspace(description)` | Create workspace in .workspaces/ for parallel development | Always |
 | `jj_workspaces()` | List all workspaces with status | Always |
 | `jj_git_init()` | Initialize JJ in non-JJ repo | Only if not JJ repo |
 | `jj_undo()` | Undo last JJ operation - instant recovery | Always |
@@ -105,7 +127,7 @@ This enforces JJ-native workflow and prevents mixing git/jj commands.
 ## Workflow Example
 
 ```
-Session starts
+Session starts in default workspace
     ↓
 Gate is LOCKED
     ↓
@@ -115,9 +137,11 @@ You attempt to edit → BLOCKED
     ↓
 You call: jj("Add input validation function to utils.ts")
     ↓
+Workspace created: .workspaces/add-input-validation-function/
+Session moved to new workspace
 Gate UNLOCKS, change ID assigned
     ↓
-You edit utils.ts freely
+You edit utils.ts freely (in workspace)
     ↓
 Work complete → jj_push()
     ↓
@@ -125,7 +149,8 @@ User confirms → pushed
     ↓
 Gate LOCKS again (checkpoint complete)
     ↓
-Next task? Call jj("description") to start new checkpoint
+Next task? Call jj("description") to create another change in same workspace
+Or return to default workspace for a completely new feature
 ```
 
 ## Natural Conversation Flow
@@ -170,7 +195,7 @@ Workspaces allow multiple OpenCode sessions to work on different features simult
 
 ```
 jj_workspace("Add authentication system")
-→ Creates: ../project--add-authentication-system/
+→ Creates: .workspaces/add-authentication-system/
 → User starts new OpenCode session in that directory
 → Both workspaces share the same repo but have isolated working copies
 ```
@@ -178,17 +203,18 @@ jj_workspace("Add authentication system")
 ### Workspace Workflow
 
 1. **Create workspace**: `jj_workspace("feature description")`
-2. **User opens new terminal**: `cd ../project--feature-slug && opencode`
+2. **User opens new terminal**: `cd .workspaces/feature-slug && opencode`
 3. **Work in workspace**: Call `jj("task description")` to unlock, make edits
 4. **Push from workspace**: `jj_push()` pushes to named bookmark
 5. **Auto-cleanup**: After push, workspace is removed from tracking
 
 ### Key Details
 
-- Workspaces are sibling directories: `../projectname--feature-slug/`
+- Workspaces are subdirectories: `.workspaces/feature-slug/`
 - Each workspace has its own working copy but shares the repo
 - Bookmarks are auto-generated from descriptions: `"Add JWT auth"` → `add-jwt-auth`
 - Gate still requires `jj()` call in new workspace sessions
+- Add `.workspaces/` to your `.gitignore`
 
 ## Named Bookmarks (Feature Branches)
 

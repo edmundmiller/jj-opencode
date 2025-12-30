@@ -137,7 +137,7 @@ const plugin: Plugin = async (ctx) => {
 
     tool: {
       jj: tool({
-        description: "Create a new JJ change and unlock file editing. Run this BEFORE making any file edits.",
+        description: "Create a new JJ change and unlock file editing. Run this BEFORE making any file edits. When called from the default workspace, automatically creates a dedicated workspace and moves the session there.",
         args: {
           description: tool.schema.string().describe("Description of the work you're about to do"),
           bookmark: tool.schema.string().optional().describe("Create a named bookmark for this change (auto-generated from description if not provided)"),
@@ -153,6 +153,57 @@ const plugin: Plugin = async (ctx) => {
           const fetchResult = await jj.gitFetch($)
           if (!fetchResult.success) {
             warning = `Note: git fetch skipped (${fetchResult.error})\n\n`
+          }
+
+          const currentWorkspace = await jj.getWorkspaceName($)
+          const isDefaultWorkspace = currentWorkspace === 'default'
+
+          if (isDefaultWorkspace && !args.from) {
+            const currentRoot = await jj.getWorkspaceRoot($)
+            const workspaceSlug = slugify(args.description)
+            const workspaceName = workspaceSlug
+            const workspacesDir = `${currentRoot}/.workspaces`
+            const workspacePath = `${workspacesDir}/${workspaceSlug}`
+
+            try {
+              await $`mkdir -p ${workspacesDir}`
+            } catch {}
+
+            const addResult = await jj.workspaceAdd($, workspacePath, workspaceName, 'main@origin')
+            if (!addResult.success) {
+              return `Error creating workspace: ${addResult.error}`
+            }
+
+            try {
+              (globalThis as any).process.chdir(workspacePath)
+            } catch (e: any) {
+              return `Error moving to workspace: ${e.message || String(e)}`
+            }
+
+            const newResult = await jj.newChangeFromCurrent($, args.description)
+            if (!newResult.success) {
+              return `Error creating change in workspace: ${newResult.error}`
+            }
+
+            const bookmarkName = args.bookmark || workspaceSlug
+            const bookmarkResult = await jj.bookmarkSet($, bookmarkName)
+
+            setState(context.sessionID, {
+              gateUnlocked: true,
+              changeId: newResult.changeId || null,
+              changeDescription: args.description,
+              isJJRepo: true,
+              workspace: workspaceName,
+              workspacePath,
+              bookmark: bookmarkResult.success ? bookmarkName : null,
+            })
+
+            return warning + messages.JJ_WORKSPACE_REDIRECT(
+              newResult.changeId || 'unknown',
+              args.description,
+              workspaceName,
+              workspacePath
+            )
           }
 
           let newResult: { success: boolean; changeId?: string; error?: string }
@@ -384,7 +435,7 @@ const plugin: Plugin = async (ctx) => {
       }),
 
       jj_workspace: tool({
-        description: "Create a new JJ workspace for parallel development. Creates a sibling directory with isolated working copy.",
+        description: "Create a new JJ workspace for parallel development. Creates workspace in .workspaces/ subdirectory with isolated working copy.",
         args: {
           description: tool.schema.string().describe("Description of the work for this workspace"),
         },
@@ -401,10 +452,14 @@ const plugin: Plugin = async (ctx) => {
           }
 
           const currentRoot = await jj.getWorkspaceRoot($)
-          const projectDirName = currentRoot.split('/').pop() || 'project'
           const workspaceSlug = slugify(args.description)
           const workspaceName = workspaceSlug
-          const workspacePath = `${currentRoot}/../${projectDirName}--${workspaceSlug}`
+          const workspacesDir = `${currentRoot}/.workspaces`
+          const workspacePath = `${workspacesDir}/${workspaceSlug}`
+
+          try {
+            await $`mkdir -p ${workspacesDir}`
+          } catch {}
 
           const addResult = await jj.workspaceAdd($, workspacePath, workspaceName, 'main@origin')
           if (!addResult.success) {
