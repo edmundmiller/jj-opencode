@@ -48,6 +48,9 @@ const READ_ONLY_TOOLS = new Set([
   'jj_undo',
   'jj_describe',
   'jj_abandon',
+  'jj_workspace',
+  'jj_workspaces',
+  'jj_cleanup',
   'skill',
   'slashcommand',
 ])
