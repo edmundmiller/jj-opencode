@@ -482,6 +482,14 @@ If you're still doing the `git stash && cd ../worktree && git stash pop` dance i
 
 ---
 
+## Pairs Well With
+
+This plugin was inspired by and works seamlessly with [oh-my-opencode](https://github.com/YeonGyu-Kim/oh-my-opencode) — an excellent OpenCode orchestration layer that enhances agent capabilities with parallel task execution and specialized subagents.
+
+**Subagent inheritance**: When you spawn subagents via the `task` tool, they inherit the parent session's gate state. If the parent called `jj()`, all subagents can edit files immediately — no need to call `jj()` again. All their changes flow into the same JJ change, making oh-my-opencode's parallel workflows work seamlessly with jj-opencode's change tracking.
+
+---
+
 ## Warnings
 
 - You might ship features faster than your team can review them
