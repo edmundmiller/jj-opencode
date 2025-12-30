@@ -44,17 +44,6 @@ myproject/
 └── ...
 ```
 
-## Agent Mode Behavior
-
-The plugin detects mode based on the tool being blocked:
-
-| Blocked Tool | Behavior |
-|--------------|----------|
-| `write`, `edit`, `lsp_rename`, etc. | **Execution**: Announce description, proceed automatically |
-| Other (bash, todowrite, etc.) | **Planning**: Suggest description, wait for approval |
-
-This means agents with file-writing capabilities proceed autonomously, while others ask first.
-
 ## Available Tools
 
 | Tool | Purpose | When Available |
