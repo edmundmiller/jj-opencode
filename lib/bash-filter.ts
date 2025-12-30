@@ -17,7 +17,7 @@ const BASH_MODIFY_PATTERNS: RegExp[] = [
   /\btruncate\b/,
   /\bdd\b/,
   /\binstall\b/,
-  /\bjj\s+(new|describe|squash|abandon|split|edit|restore|diffedit)\b/,
+  /\bjj\s+(new|describe)\b/,
   /\bnpm\s+(install|uninstall|update|init|link|publish)\b/,
   /\byarn\s+(add|remove|install|link)\b/,
   /\bpnpm\s+(add|remove|install|link)\b/,

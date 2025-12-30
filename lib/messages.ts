@@ -152,19 +152,35 @@ export const WORKSPACE_LIST_HEADER = `
 | Workspace | Path | Change | Description |
 |-----------|------|--------|-------------|`
 
-export const PUSH_SUCCESS_WITH_CLEANUP = (bookmark: string, workspaceName: string, workspacePath: string): string => `
+export const PUSH_SUCCESS_WITH_CLEANUP = (bookmark: string, workspaceName: string): string => `
 **Pushed successfully**
 
-Change pushed to **${bookmark}**.
+Change pushed to **${bookmark}** and synced to origin.
 
-**Workspace cleanup**: \`${workspaceName}\` has been removed from tracking.
+**Cleanup complete:**
+- Workspace \`${workspaceName}\` removed
+- Session moved to repo root
+- Synced with origin
 
-To delete the workspace directory:
-\`\`\`bash
-rm -rf ${workspacePath}
-\`\`\`
+**Gate locked.** Ready for next task - call \`jj("description")\` to start a new change.
+`
 
-Return to your main project directory to continue.
+export const WORKSPACE_EMPTY_CHANGES = (workspaceName: string): string => `
+**No changes in workspace \`${workspaceName}\`**
+
+This workspace has no file modifications. Would you like to:
+- **Clean up** the workspace without pushing (call \`jj_push(confirm: true)\`)
+- **Make changes** first, then push
+
+If this workspace was created accidentally, confirming will clean it up.
+`
+
+export const WORKSPACE_CLEANUP_ONLY = (workspaceName: string): string => `
+**Workspace cleaned up**
+
+Workspace \`${workspaceName}\` has been removed (no changes were pushed).
+
+**Gate locked.** Ready for next task - call \`jj("description")\` to start a new change.
 `
 
 export const JJ_INIT_SUCCESS_WITH_BOOKMARK = (changeId: string, description: string, bookmark: string): string => `

@@ -169,6 +169,12 @@ const plugin: Plugin = async (ctx) => {
               await $`mkdir -p ${workspacesDir}`
             } catch {}
 
+            const ignoreResult = await jj.ensureWorkspacesIgnored($, currentRoot)
+            let gitignoreNote = ''
+            if (ignoreResult.added) {
+              gitignoreNote = '**Note**: Added `.workspaces/` to `.gitignore`\n\n'
+            }
+
             const addResult = await jj.workspaceAdd($, workspacePath, workspaceName, 'main@origin')
             if (!addResult.success) {
               return `Error creating workspace: ${addResult.error}`
@@ -198,7 +204,7 @@ const plugin: Plugin = async (ctx) => {
               bookmark: bookmarkResult.success ? bookmarkName : null,
             })
 
-            return warning + messages.JJ_WORKSPACE_REDIRECT(
+            return warning + gitignoreNote + messages.JJ_WORKSPACE_REDIRECT(
               newResult.changeId || 'unknown',
               args.description,
               workspaceName,
@@ -281,9 +287,9 @@ const plugin: Plugin = async (ctx) => {
       }),
 
       jj_push: tool({
-        description: "Validate changes and push to remote. ALWAYS shows preview and requests USER permission. Never auto-confirm - wait for explicit user approval before calling with confirm:true.",
+        description: "Validate changes and push to remote. ALWAYS shows preview and requests USER permission. Never auto-confirm - wait for explicit user approval before calling with confirm:true. From workspaces, moves main bookmark to current change, pushes, then cleans up workspace.",
         args: {
-          bookmark: tool.schema.string().optional().describe("Bookmark name to push (defaults to session bookmark or 'main')"),
+          bookmark: tool.schema.string().optional().describe("Bookmark name to push (defaults to 'main')"),
           confirm: tool.schema.boolean().optional().describe("Set to true ONLY after receiving explicit user permission to push"),
         },
         async execute(args, context) {
@@ -292,11 +298,34 @@ const plugin: Plugin = async (ctx) => {
             return messages.GATE_NOT_UNLOCKED
           }
 
-          const bookmark = args.bookmark || state.bookmark || 'main'
           const isNonDefaultWorkspace = state.workspace !== 'default' && state.workspace !== ''
-
           const diffFiles = await jj.getDiffFiles($)
+          
           if (diffFiles.length === 0) {
+            if (isNonDefaultWorkspace) {
+              if (!args.confirm) {
+                return messages.WORKSPACE_EMPTY_CHANGES(state.workspace!)
+              }
+              const repoRoot = state.workspacePath?.replace(/\/.workspaces\/[^/]+$/, '') || ''
+              await jj.workspaceForget($, state.workspace!)
+              if (repoRoot) {
+                try { (globalThis as any).process.chdir(repoRoot) } catch {}
+              }
+              if (state.workspacePath) {
+                try { await $`rm -rf ${state.workspacePath}` } catch {}
+              }
+              await jj.gitFetch($)
+              setState(context.sessionID, {
+                gateUnlocked: false,
+                changeId: null,
+                changeDescription: '',
+                modifiedFiles: [],
+                bookmark: null,
+                workspace: 'default',
+                workspacePath: repoRoot,
+              })
+              return messages.WORKSPACE_CLEANUP_ONLY(state.workspace!)
+            }
             return messages.PUSH_NO_CHANGES
           }
 
@@ -306,7 +335,7 @@ const plugin: Plugin = async (ctx) => {
           if (!args.confirm) {
             let confirmMsg = messages.PUSH_CONFIRMATION(description, diffFiles, diffSummary)
             if (isNonDefaultWorkspace) {
-              confirmMsg += `\n\n**Note**: After push, workspace \`${state.workspace}\` will be cleaned up.`
+              confirmMsg += `\n\n**Workspace cleanup**: After push, \`${state.workspace}\` will be removed and you'll return to the main project directory.`
             }
             return confirmMsg
           }
@@ -316,6 +345,7 @@ const plugin: Plugin = async (ctx) => {
             warning = messages.PUSH_DESCRIPTION_WARNING(description, diffFiles) + '\n\n'
           }
 
+          const bookmark = args.bookmark || 'main'
           const bookmarkResult = await jj.bookmarkMove($, bookmark)
           if (!bookmarkResult.success) {
             return `Error moving bookmark '${bookmark}': ${bookmarkResult.error}`
@@ -327,7 +357,25 @@ const plugin: Plugin = async (ctx) => {
           }
 
           if (isNonDefaultWorkspace) {
-            await jj.workspaceForget($, state.workspace)
+            const repoRoot = state.workspacePath?.replace(/\/.workspaces\/[^/]+$/, '') || ''
+            await jj.workspaceForget($, state.workspace!)
+            if (repoRoot) {
+              try { (globalThis as any).process.chdir(repoRoot) } catch {}
+            }
+            if (state.workspacePath) {
+              try { await $`rm -rf ${state.workspacePath}` } catch {}
+            }
+            await jj.gitFetch($)
+            setState(context.sessionID, {
+              gateUnlocked: false,
+              changeId: null,
+              changeDescription: '',
+              modifiedFiles: [],
+              bookmark: null,
+              workspace: 'default',
+              workspacePath: repoRoot,
+            })
+            return warning + messages.PUSH_SUCCESS_WITH_CLEANUP(bookmark, state.workspace!)
           }
 
           setState(context.sessionID, {
@@ -337,10 +385,6 @@ const plugin: Plugin = async (ctx) => {
             modifiedFiles: [],
             bookmark: null,
           })
-
-          if (isNonDefaultWorkspace) {
-            return warning + messages.PUSH_SUCCESS_WITH_CLEANUP(bookmark, state.workspace, state.workspacePath)
-          }
           return warning + messages.PUSH_SUCCESS(description, bookmark)
         },
       }),

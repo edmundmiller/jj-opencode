@@ -277,3 +277,36 @@ export async function getParentDescription($: Shell): Promise<string> {
     return ''
   }
 }
+
+export async function getRepoRoot($: Shell): Promise<string> {
+  try {
+    const result = await $`jj root`.text()
+    return result.trim()
+  } catch {
+    return ''
+  }
+}
+
+export async function ensureWorkspacesIgnored($: Shell, repoRoot: string): Promise<{ added: boolean; error?: string }> {
+  const gitignorePath = `${repoRoot}/.gitignore`
+  try {
+    let content = ''
+    try {
+      content = await $`cat ${gitignorePath}`.text()
+    } catch {
+      // File doesn't exist, that's fine
+    }
+    
+    if (content.includes('.workspaces')) {
+      return { added: false }
+    }
+    
+    const addition = content.endsWith('\n') || content === '' 
+      ? '.workspaces/\n' 
+      : '\n.workspaces/\n'
+    await $`echo ${addition} >> ${gitignorePath}`
+    return { added: true }
+  } catch (e: any) {
+    return { added: false, error: e.message || String(e) }
+  }
+}
