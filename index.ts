@@ -381,7 +381,7 @@ const plugin: Plugin = async (ctx) => {
       }),
 
       jj_push: tool({
-        description: "Validate changes and push to remote. ALWAYS shows preview and requests USER permission. Never auto-confirm - wait for explicit user approval before calling with confirm:true. From workspaces, moves main bookmark to current change, pushes, then cleans up workspace.",
+        description: "Push changes to remote. When called without confirm:true, returns a detailed preview (description, file list, diff summary) that you MUST display to the user. Never summarize - show the full preview. Only call with confirm:true after explicit user approval.",
         args: {
           bookmark: tool.schema.string().optional().describe("Bookmark name to push (defaults to 'main')"),
           confirm: tool.schema.boolean().optional().describe("Set to true ONLY after receiving explicit user permission to push"),

@@ -101,33 +101,34 @@ export const PUSH_CONFIRMATION = (description: string, files: string[], diffSumm
   const firstLine = description.split('\n')[0].trim()
   const hasMoreLines = description.includes('\n')
   
-  let msg = `**Push requires your approval**
+  // Leading directive so AI doesn't summarize
+  let msg = `[DISPLAY THIS PREVIEW TO USER - DO NOT SUMMARIZE]
 
-| Field | Value |
-|-------|-------|
-| Description | ${firstLine}${hasMoreLines ? ' ...' : ''} |
-| Files changed | ${files.length} |
+## Ready to push
+
+| | |
+|---|---|
+| **Description** | ${firstLine}${hasMoreLines ? ' ...' : ''} |
+| **Files** | ${files.length} changed |
 `
 
   if (hasMoreLines) {
     msg += `
-### Full Description
+**Full description:**
 > ${description.split('\n').map(l => l.trim()).join('\n> ')}
 `
   }
 
   msg += `
-### Files
-${files.map(f => '- ' + f).join('\n')}
+**Changed files:**
+${files.map(f => '- `' + f + '`').join('\n')}
 
-### Diff Summary
+**Diff:**
 \`\`\`
 ${diffSummary}
 \`\`\`
 
-**Please confirm you want to push these changes.** I will not push without your explicit approval.
-
-To update the description first: \`jj describe -m "new description"\`
+Confirm push?
 `
   return msg
 }
