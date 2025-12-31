@@ -1,5 +1,9 @@
 type Shell = any
 
+interface RepoConfig {
+  defaultBranch?: string
+}
+
 function shell($: Shell, cwd?: string): Shell {
   return cwd ? $.cwd(cwd) : $
 }
@@ -13,10 +17,62 @@ export async function isJJRepo($: Shell, cwd?: string): Promise<boolean> {
   }
 }
 
-export async function getDefaultBranch($: Shell, cwd?: string): Promise<string> {
+export async function getRepoRoot($: Shell, cwd?: string): Promise<string> {
+  const result = await shell($, cwd)`jj root 2>/dev/null`.text()
+  return result.trim()
+}
+
+export async function readRepoConfig($: Shell, repoRoot: string): Promise<RepoConfig> {
+  try {
+    const content = await $`cat ${repoRoot}/.jj-opencode.json 2>/dev/null`.text()
+    return JSON.parse(content.trim())
+  } catch {
+    return {}
+  }
+}
+
+export async function writeRepoConfig($: Shell, repoRoot: string, config: RepoConfig): Promise<void> {
+  const json = JSON.stringify(config, null, 2)
+  await $`echo ${json} > ${repoRoot}/.jj-opencode.json`
+}
+
+export async function getSavedDefaultBranch($: Shell, repoRoot: string): Promise<string | null> {
+  const config = await readRepoConfig($, repoRoot)
+  return config.defaultBranch || null
+}
+
+export async function saveDefaultBranch($: Shell, repoRoot: string, branch: string): Promise<void> {
+  const config = await readRepoConfig($, repoRoot)
+  config.defaultBranch = branch
+  await writeRepoConfig($, repoRoot, config)
+}
+
+async function detectRemoteDefaultBranch($: Shell, cwd?: string): Promise<string | null> {
   const s = shell($, cwd)
-  const candidates = ['main', 'master']
+  try {
+    const ref = await s`git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null`.text()
+    const match = ref.trim().match(/refs\/remotes\/origin\/(.+)/)
+    if (match) return match[1]
+  } catch {}
+  return null
+}
+
+async function detectDefaultBranch($: Shell, cwd?: string): Promise<string> {
+  const s = shell($, cwd)
   
+  const detected = await detectRemoteDefaultBranch($, cwd)
+  if (detected) {
+    try {
+      await s`jj log -r ${detected}@origin --no-graph -T '' 2>/dev/null`.text()
+      return detected
+    } catch {}
+    try {
+      await s`jj log -r ${detected} --no-graph -T '' 2>/dev/null`.text()
+      return detected
+    } catch {}
+  }
+  
+  const candidates = ['main', 'master', 'trunk', 'develop', 'dev']
   for (const branch of candidates) {
     try {
       await s`jj log -r ${branch}@origin --no-graph -T '' 2>/dev/null`.text()
@@ -31,23 +87,23 @@ export async function getDefaultBranch($: Shell, cwd?: string): Promise<string> 
   return 'main'
 }
 
+export async function getDefaultBranch($: Shell, cwd?: string): Promise<string> {
+  const repoRoot = await getRepoRoot($, cwd)
+  const saved = await getSavedDefaultBranch($, repoRoot)
+  if (saved) return saved
+  return detectDefaultBranch($, cwd)
+}
+
 export async function getDefaultBranchRevset($: Shell, cwd?: string): Promise<string> {
   const s = shell($, cwd)
-  const candidates = [
-    'main@origin',
-    'master@origin', 
-    'main',
-    'master',
-  ]
+  const branch = await getDefaultBranch($, cwd)
   
-  for (const revset of candidates) {
-    try {
-      await s`jj log -r ${revset} --no-graph -T '' 2>/dev/null`.text()
-      return revset
-    } catch {}
-  }
+  try {
+    await s`jj log -r ${branch}@origin --no-graph -T '' 2>/dev/null`.text()
+    return `${branch}@origin`
+  } catch {}
   
-  return 'main'
+  return branch
 }
 
 export async function getCurrentChangeId($: Shell, cwd?: string): Promise<string | null> {

@@ -428,9 +428,16 @@ const plugin: Plugin = async (ctx) => {
           }
 
           const diffSummary = await jj.getDiffSummary($, cwd)
+          const repoRoot = isNonDefaultWorkspace 
+            ? actualWorkspacePath.replace(/\/.workspaces\/[^/]+$/, '')
+            : await jj.getRepoRoot($, cwd)
+          const savedBranch = await jj.getSavedDefaultBranch($, repoRoot)
+          const detectedBranch = await jj.getDefaultBranch($, cwd)
+          const targetBranch = args.bookmark || savedBranch || detectedBranch
+          const isFirstPush = !savedBranch && !args.bookmark
 
           if (!args.confirm) {
-            let confirmMsg = messages.PUSH_CONFIRMATION(currentDesc, diffFiles, diffSummary)
+            let confirmMsg = messages.PUSH_CONFIRMATION(currentDesc, diffFiles, diffSummary, targetBranch, isFirstPush)
             if (isNonDefaultWorkspace) {
               confirmMsg += `\n\n**Workspace cleanup**: After push, \`${actualWorkspace}\` will be removed and you'll return to the main project directory.`
             }
@@ -442,8 +449,11 @@ const plugin: Plugin = async (ctx) => {
             warning = messages.PUSH_DESCRIPTION_WARNING(currentDesc, diffFiles) + '\n\n'
           }
 
-          const defaultBranch = await jj.getDefaultBranch($, cwd)
-          const bookmark = args.bookmark || defaultBranch
+          if (isFirstPush) {
+            await jj.saveDefaultBranch($, repoRoot, targetBranch)
+          }
+
+          const bookmark = targetBranch
           const bookmarkResult = await jj.bookmarkMove($, bookmark, cwd)
           if (!bookmarkResult.success) {
             return `Error moving bookmark '${bookmark}': ${bookmarkResult.error}`

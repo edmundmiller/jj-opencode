@@ -97,20 +97,26 @@ Single-word descriptions don't provide enough context. Please describe what chan
 Example: "Fix pagination bug in user list"
 `
 
-export const PUSH_CONFIRMATION = (description: string, files: string[], diffSummary: string): string => {
+export const PUSH_CONFIRMATION = (description: string, files: string[], diffSummary: string, targetBranch: string, isFirstPush: boolean): string => {
   const firstLine = description.split('\n')[0].trim()
   const hasMoreLines = description.includes('\n')
   
-  // Leading directive so AI doesn't summarize
   let msg = `[DISPLAY THIS PREVIEW TO USER - DO NOT SUMMARIZE]
 
-## Ready to push
+## Ready to push to \`${targetBranch}\`
 
 | | |
 |---|---|
+| **Target** | \`${targetBranch}\` |
 | **Description** | ${firstLine}${hasMoreLines ? ' ...' : ''} |
 | **Files** | ${files.length} changed |
 `
+
+  if (isFirstPush) {
+    msg += `
+> **First push**: \`${targetBranch}\` will be saved as your default branch for this repo.
+`
+  }
 
   if (hasMoreLines) {
     msg += `
@@ -128,7 +134,7 @@ ${files.map(f => '- `' + f + '`').join('\n')}
 ${diffSummary}
 \`\`\`
 
-Confirm push?
+Confirm push to \`${targetBranch}\`?
 `
   return msg
 }
