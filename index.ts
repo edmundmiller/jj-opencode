@@ -257,7 +257,8 @@ const plugin: Plugin = async (ctx) => {
               gitignoreNote = '**Note**: Added `.workspaces/` to `.gitignore`\n\n'
             }
 
-            const addResult = await jj.workspaceAdd($, workspacePath, workspaceName, 'main@origin', actualRepoRoot)
+            const defaultBranch = await jj.getDefaultBranch($, actualRepoRoot)
+            const addResult = await jj.workspaceAdd($, workspacePath, workspaceName, `${defaultBranch}@origin`, actualRepoRoot)
             if (!addResult.success) {
               return `Error creating workspace: ${addResult.error}`
             }
@@ -411,7 +412,7 @@ const plugin: Plugin = async (ctx) => {
               await jj.workspaceForget($, actualWorkspace, repoRoot)
               try { await $`rm -rf ${actualWorkspacePath}` } catch {}
               await jj.gitFetch($, repoRoot)
-              await jj.newFromMain($, repoRoot)
+              await jj.newFromDefaultBranch($, repoRoot)
               setState(context.sessionID, {
                 gateUnlocked: false,
                 changeId: null,
@@ -441,7 +442,8 @@ const plugin: Plugin = async (ctx) => {
             warning = messages.PUSH_DESCRIPTION_WARNING(currentDesc, diffFiles) + '\n\n'
           }
 
-          const bookmark = args.bookmark || 'main'
+          const defaultBranch = await jj.getDefaultBranch($, cwd)
+          const bookmark = args.bookmark || defaultBranch
           const bookmarkResult = await jj.bookmarkMove($, bookmark, cwd)
           if (!bookmarkResult.success) {
             return `Error moving bookmark '${bookmark}': ${bookmarkResult.error}`
@@ -457,7 +459,7 @@ const plugin: Plugin = async (ctx) => {
             await jj.workspaceForget($, actualWorkspace, repoRoot)
             try { await $`rm -rf ${actualWorkspacePath}` } catch {}
             await jj.gitFetch($, repoRoot)
-            await jj.newFromMain($, repoRoot)
+            await jj.newFromDefaultBranch($, repoRoot)
             setState(context.sessionID, {
               gateUnlocked: false,
               changeId: null,
@@ -574,7 +576,7 @@ const plugin: Plugin = async (ctx) => {
               try { await $`rm -rf ${workspacePath}` } catch {}
             }
             await jj.gitFetch($, repoRoot)
-            await jj.newFromMain($, repoRoot)
+            await jj.newFromDefaultBranch($, repoRoot)
             setState(context.sessionID, {
               gateUnlocked: false,
               changeId: null,
@@ -623,7 +625,8 @@ const plugin: Plugin = async (ctx) => {
             await $`mkdir -p ${workspacesDir}`
           } catch {}
 
-          const addResult = await jj.workspaceAdd($, workspacePath, workspaceName, 'main@origin', actualRepoRoot)
+          const defaultBranch = await jj.getDefaultBranch($, actualRepoRoot)
+          const addResult = await jj.workspaceAdd($, workspacePath, workspaceName, `${defaultBranch}@origin`, actualRepoRoot)
           if (!addResult.success) {
             return `Error creating workspace: ${addResult.error}`
           }

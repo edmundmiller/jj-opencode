@@ -13,6 +13,25 @@ export async function isJJRepo($: Shell, cwd?: string): Promise<boolean> {
   }
 }
 
+export async function getDefaultBranch($: Shell, cwd?: string): Promise<string> {
+  const s = shell($, cwd)
+  const candidates = [
+    { revset: 'main@origin', branch: 'main' },
+    { revset: 'master@origin', branch: 'master' },
+    { revset: 'main', branch: 'main' },
+    { revset: 'master', branch: 'master' },
+  ]
+  
+  for (const { revset, branch } of candidates) {
+    try {
+      await s`jj log -r ${revset} --no-graph -T '' 2>/dev/null`.text()
+      return branch
+    } catch {}
+  }
+  
+  return 'main'
+}
+
 export async function getCurrentChangeId($: Shell, cwd?: string): Promise<string | null> {
   try {
     const result = await shell($, cwd)`jj log -r @ --no-graph -T 'change_id.short()' 2>/dev/null`.text()
@@ -76,14 +95,16 @@ export async function gitFetch($: Shell, cwd?: string): Promise<{ success: boole
   }
 }
 
-export async function newFromMain($: Shell, cwd?: string): Promise<{ success: boolean; error?: string }> {
+export async function newFromDefaultBranch($: Shell, cwd?: string): Promise<{ success: boolean; error?: string }> {
   const s = shell($, cwd)
+  const branch = await getDefaultBranch($, cwd)
+  
   try {
-    await s`jj new main@origin 2>/dev/null`.text()
+    await s`jj new ${branch}@origin 2>/dev/null`.text()
     return { success: true }
   } catch {
     try {
-      await s`jj new main 2>/dev/null`.text()
+      await s`jj new ${branch} 2>/dev/null`.text()
       return { success: true }
     } catch (e: any) {
       return { success: false, error: e.message || String(e) }
@@ -93,19 +114,21 @@ export async function newFromMain($: Shell, cwd?: string): Promise<{ success: bo
 
 export async function newChange($: Shell, description: string, cwd?: string): Promise<{ success: boolean; changeId?: string; error?: string }> {
   const s = shell($, cwd)
+  const branch = await getDefaultBranch($, cwd)
+  
   try {
-    await s`jj new main@origin -m ${description} 2>/dev/null`.text()
+    await s`jj new ${branch}@origin -m ${description} 2>/dev/null`.text()
     const changeId = await getCurrentChangeId($, cwd)
     return { success: true, changeId: changeId || undefined }
   } catch {
     try {
-      await s`jj new main -m ${description} 2>/dev/null`.text()
+      await s`jj new ${branch} -m ${description} 2>/dev/null`.text()
       const changeId = await getCurrentChangeId($, cwd)
       return { success: true, changeId: changeId || undefined }
     } catch (e: any) {
       return { 
         success: false, 
-        error: `Could not branch from main@origin or main. Error: ${e.message || String(e)}. Make sure you have a 'main' branch.`
+        error: `Could not branch from ${branch}@origin or ${branch}. Error: ${e.message || String(e)}. Make sure you have a '${branch}' branch.`
       }
     }
   }
@@ -329,6 +352,7 @@ export async function analyzeWorkspaces($: Shell, cwd?: string): Promise<Workspa
   const result: WorkspaceAnalysis = { stale: [], active: [] }
   try {
     const s = shell($, cwd)
+    const branch = await getDefaultBranch($, cwd)
     const listResult = await s`jj workspace list 2>/dev/null`.text()
     const lines = listResult.trim().split('\n')
     
@@ -345,11 +369,11 @@ export async function analyzeWorkspaces($: Shell, cwd?: string): Promise<Workspa
       const hasNoDescription = rest.includes('(no description set)')
       
       try {
-        const output = await s`jj log -r '${changeId} & ::main' --no-graph -T 'change_id' 2>/dev/null`.text()
+        const output = await s`jj log -r '${changeId} & ::${branch}' --no-graph -T 'change_id' 2>/dev/null`.text()
         const isMerged = output.trim().length > 0
         
         if (isMerged) {
-          result.stale.push({ name, changeId, reason: 'already merged to main' })
+          result.stale.push({ name, changeId, reason: `already merged to ${branch}` })
         } else if (isEmpty && hasNoDescription) {
           result.stale.push({ name, changeId, reason: 'empty workspace' })
         } else if (isEmpty) {
