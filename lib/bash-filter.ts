@@ -62,8 +62,8 @@ export function checkForGitCommand(command: string): GitCommandCheck {
 
 // JJ commands that have plugin equivalents - warn but don't block
 const JJ_PLUGIN_EQUIVALENT: Record<string, string> = {
-  new: 'jj("description") - handles workspace creation and gate state',
-  describe: 'jj_describe("message") - keeps plugin state in sync',
+  new: 'jj("description")',
+  describe: 'jj_describe("message")',
 };
 
 const JJ_COMMAND_PATTERN = /\bjj\s+(new|describe)\b/i;

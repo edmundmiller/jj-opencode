@@ -350,8 +350,8 @@ export const CLEANUP_SUCCESS = (abandoned: number, workspacesRemoved: number, de
 }
 
 export const JJ_COMMAND_WARNING = (jjSubcommand: string, pluginAlternative: string): string =>
-  `**Note**: Consider using \`${pluginAlternative}\` instead of \`jj ${jjSubcommand}\` — ` +
-  `the plugin tool handles workspace creation and gate state automatically.\n\n` +
+  `Note: Consider using ${pluginAlternative} instead of jj ${jjSubcommand} — ` +
+  `the plugin tool handles workspace creation and gate state automatically. ` +
   `Command executed anyway.`
 
 export const BASH_MODIFY_WARNING = (command: string): string =>
